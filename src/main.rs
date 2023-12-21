@@ -9,7 +9,7 @@ use game_of_life::bindgen_glue::{cancel_animation_frame, document, request_anima
 use game_of_life::console_log;
 use game_of_life::frames_per_second::FramesPerSecond;
 use game_of_life::universe::{Cell, Universe, GRID_COLUMNS, GRID_ROWS};
-use wasm_bindgen::prelude::Closure;
+use wasm_bindgen::prelude::{wasm_bindgen, Closure};
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::CanvasRenderingContext2d;
 
@@ -28,7 +28,6 @@ const DEAD_COLOR: &str = "#000000";
 extern crate console_error_panic_hook;
 use std::panic;
 
-use wasm_bindgen::prelude::wasm_bindgen;
 #[wasm_bindgen]
 pub fn init_panic_hook() {
     // Better logging of panics in the browser
@@ -36,9 +35,10 @@ pub fn init_panic_hook() {
 }
 
 fn main() {
+    console_log!("Starting...");
+
     // launch the dioxus app in a webview
     // dioxus_desktop::launch(App);
-    console_log!("Starting...");
     dioxus_web::launch(App);
 }
 
@@ -67,7 +67,19 @@ fn get_2d_context() -> CanvasRenderingContext2d {
         .unwrap()
 }
 
-fn config_canvas(universe: Rc<Mutex<Universe>>) {
+/// Wait for the first animation frame before re-configuring the canvas element.
+///
+/// If we try to configure it before the first render, it may not have been creted yet.
+fn config_canvas_after_render(universe: Rc<RefCell<Universe>>) {
+    let config_canvas_closure = Closure::<dyn FnMut()>::new(move || {
+        config_canvas(universe.clone());
+    });
+    request_animation_frame(&config_canvas_closure);
+    // Forget the closure so the runtime does not try to manage it.
+    config_canvas_closure.forget();
+}
+
+fn config_canvas(universe: Rc<RefCell<Universe>>) {
     if let Some(canvas_ele) = document().get_element_by_id(CANVAS_ID) {
         console_log!("Configuring canvas...");
 
@@ -105,9 +117,9 @@ fn config_canvas(universe: Rc<Mutex<Universe>>) {
                     .floor()
                     .min((GRID_HEIGHT - 1) as f64) as u32;
 
-                universe.lock().unwrap().toggle_cell(row, col);
+                universe.borrow_mut().toggle_cell(row, col);
 
-                draw_cells(&universe.lock().unwrap());
+                draw_cells(&universe.borrow_mut());
 
                 // console_log!("Row: {row} Col: {col}");
             });
@@ -190,8 +202,7 @@ fn fill_cells(context: &CanvasRenderingContext2d, cells: &[Cell], cell_type: Cel
     }
 }
 
-use std::sync::Mutex;
-pub fn update_frame_loop(universe: Rc<Mutex<Universe>>) {
+pub fn update_frame_loop(universe: Rc<RefCell<Universe>>) {
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
 
@@ -204,12 +215,12 @@ pub fn update_frame_loop(universe: Rc<Mutex<Universe>>) {
         let id = request_animation_frame(f.borrow().as_ref().unwrap());
 
         if !check {
-            config_canvas(universe.clone());
+            // config_canvas(universe.clone());
             check = true;
         }
         draw_grid();
-        draw_cells(&universe.lock().unwrap());
-        universe.lock().unwrap().tick();
+        draw_cells(&universe.borrow_mut());
+        universe.borrow_mut().tick();
         document()
             .get_element_by_id("animation-id")
             .unwrap()
@@ -221,13 +232,13 @@ pub fn update_frame_loop(universe: Rc<Mutex<Universe>>) {
 
 #[component]
 fn Universe(cx: Scope, name: String) -> Element {
-    let universe = Rc::new(Mutex::new(Universe::new()));
+    let universe = Rc::new(RefCell::new(Universe::new()));
+    config_canvas_after_render(universe.clone());
     update_frame_loop(universe.clone());
-    config_canvas(universe.clone());
 
     let mut count = use_state(cx, || 0);
-    let height = universe.lock().unwrap().height();
-    let width = universe.lock().unwrap().width();
+    let height = universe.borrow().height();
+    let width = universe.borrow().width();
     let universe_clear = universe.clone();
     let universe_random = universe.clone();
 
@@ -262,15 +273,15 @@ fn Universe(cx: Scope, name: String) -> Element {
             }
             button {
                 onclick: move |_| {
-                    universe_clear.lock().unwrap().clear();
-                    draw_cells(&universe_clear.lock().unwrap());
+                    universe_clear.borrow_mut().clear();
+                    draw_cells(&universe_clear.borrow_mut());
                 },
                 "Clear"
             }
             button {
                 onclick: move |_| {
-                    universe_random.lock().unwrap().random();
-                    draw_cells(&universe_random.lock().unwrap());
+                    universe_random.borrow_mut().random();
+                    draw_cells(&universe_random.borrow_mut());
                 },
                 "Random"
             }
