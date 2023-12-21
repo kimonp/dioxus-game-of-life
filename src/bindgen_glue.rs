@@ -2,6 +2,13 @@
 
 use wasm_bindgen::prelude::*;
 
+#[macro_export]
+macro_rules! console_log {
+    ($($t:tt)*) => (
+        web_sys::console::log_1(&format!($($t)*).into())
+    )
+}
+
 pub fn window() -> web_sys::Window {
     web_sys::window().expect("no global `window` exists")
 }

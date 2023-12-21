@@ -3,11 +3,6 @@
 // use rand::{Rng, thread_rng};
 use web_sys::js_sys::Math;
 
-// use web_sys::console;
-// macro_rules! console_log {
-//     ($($t:tt)*) => (console::log_1(&format!($($t)*).into()))
-//}
-
 pub const GRID_ROWS: u32 = 64;
 pub const GRID_COLUMNS: u32 = 64;
 
@@ -44,10 +39,9 @@ impl Universe {
         let width = GRID_ROWS;
         let height = GRID_COLUMNS;
 
-        let cells = (0..width * height)
-            .map(|_i| { Cell::Dead })
-            .collect();
+        let cells = (0..width * height).map(|_i| Cell::Dead).collect();
 
+        console_log!("Test logging");
         Universe {
             width,
             height,
@@ -82,7 +76,7 @@ impl Universe {
     }
 
     /// Advance the universe one tick.
-    /// 
+    ///
     /// Kill dead cells and spawn new ones depending the neigbor count of each cell.
     pub fn tick(&mut self) {
         let mut next = self.cells.clone();
@@ -174,7 +168,7 @@ impl Universe {
     pub fn get_cells(&self) -> &[Cell] {
         &self.cells
     }
-    
+
     /// Set cells to be alive in a universe by passing the row and column
     /// of each cell as an array.
     pub fn set_cells(&mut self, cells: &[(u32, u32)]) {
