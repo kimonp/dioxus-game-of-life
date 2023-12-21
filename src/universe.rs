@@ -29,9 +29,7 @@ pub struct Universe {
     cells: Vec<Cell>,
 }
 
-fn get_random_int(max: u32) -> u32 {
-    Math::abs(Math::floor(Math::random() * max as f64)) as u32
-}
+impl Default for Universe { fn default() -> Self { Self::new() } }
 
 impl Universe {
     /// Create a new universe with the standard height and width.
@@ -178,3 +176,8 @@ impl Universe {
         }
     }
 }
+
+fn get_random_int(max: u32) -> u32 {
+    Math::abs(Math::floor(Math::random() * max as f64)) as u32
+}
+

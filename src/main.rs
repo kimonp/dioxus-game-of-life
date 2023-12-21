@@ -169,7 +169,7 @@ fn draw_cells(universe: &Universe) {
     fill_cells(&context, cells, Cell::Dead);
 }
 
-fn fill_cells(context: &CanvasRenderingContext2d, cells: &Vec<Cell>, cell_type: Cell) {
+fn fill_cells(context: &CanvasRenderingContext2d, cells: &[Cell], cell_type: Cell) {
     for row in 0..GRID_ROWS {
         for col in 0..GRID_COLUMNS {
             let index = get_grid_index(row, col);
@@ -203,7 +203,7 @@ pub fn update_frame_loop(universe: Rc<Mutex<Universe>>) {
         frames_per_second.update_frame();
         let id = request_animation_frame(f.borrow().as_ref().unwrap());
 
-        if check == false {
+        if !check {
             config_canvas(universe.clone());
             check = true;
         }
