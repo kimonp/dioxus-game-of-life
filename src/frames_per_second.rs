@@ -68,7 +68,7 @@ max of last 100 = {max}
 
         self.last_timeframe_stamp = now;
 
-        let latest_fps = 1 as f64 / delta * 1000 as f64;
+        let latest_fps = 1_f64 / delta * 1000_f64;
         self.frames.push_front(latest_fps);
 
         if self.frames.len() > 100 {
@@ -76,6 +76,7 @@ max of last 100 = {max}
         }
 
         let element_id = &self.element_id;
+        #[allow(clippy::expect_fun_call)]
         let element = document().get_element_by_id(element_id).expect(&format!("Could not find element {element_id}"));
         element.set_text_content(Some(&self.text()))
     }

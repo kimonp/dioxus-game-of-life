@@ -2,6 +2,13 @@
 
 use wasm_bindgen::prelude::*;
 
+#[macro_export]
+macro_rules! console_log {
+    ($($t:tt)*) => (
+        web_sys::console::log_1(&format!($($t)*).into())
+    )
+}
+
 pub fn window() -> web_sys::Window {
     web_sys::window().expect("no global `window` exists")
 }
@@ -13,7 +20,7 @@ pub fn request_animation_frame(f: &Closure<dyn FnMut()>) -> i32 {
         .expect("should register `requestAnimationFrame` OK")
 }
 
-pub fn cancel_animation_frame(animation_id: i32) -> () {
+pub fn cancel_animation_frame(animation_id: i32) {
     window().cancel_animation_frame(animation_id).expect("Unable to cancel animation_frame")
 }
 

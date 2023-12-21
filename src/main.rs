@@ -6,12 +6,12 @@ use dioxus::html::GlobalAttributes;
 use dioxus::prelude::*;
 
 use game_of_life::bindgen_glue::{cancel_animation_frame, document, request_animation_frame};
+use game_of_life::console_log;
 use game_of_life::frames_per_second::FramesPerSecond;
 use game_of_life::universe::{Cell, Universe, GRID_COLUMNS, GRID_ROWS};
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::{JsCast, JsValue};
-use web_sys::console::debug;
-use web_sys::{console, CanvasRenderingContext2d};
+use web_sys::CanvasRenderingContext2d;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -24,10 +24,6 @@ const GRID_HEIGHT: u32 = (CELL_SIZE + 1) * GRID_ROWS + 1;
 const GRID_COLOR: &str = "#CCCCCC";
 const ALIVE_COLOR: &str = "#FFFFFF";
 const DEAD_COLOR: &str = "#000000";
-
-macro_rules! console_log {
-    ($($t:tt)*) => (console::log_1(&format!($($t)*).into()))
-}
 
 extern crate console_error_panic_hook;
 use std::panic;
@@ -173,7 +169,7 @@ fn draw_cells(universe: &Universe) {
     fill_cells(&context, cells, Cell::Dead);
 }
 
-fn fill_cells(context: &CanvasRenderingContext2d, cells: &Vec<Cell>, cell_type: Cell) {
+fn fill_cells(context: &CanvasRenderingContext2d, cells: &[Cell], cell_type: Cell) {
     for row in 0..GRID_ROWS {
         for col in 0..GRID_COLUMNS {
             let index = get_grid_index(row, col);
@@ -207,7 +203,7 @@ pub fn update_frame_loop(universe: Rc<Mutex<Universe>>) {
         frames_per_second.update_frame();
         let id = request_animation_frame(f.borrow().as_ref().unwrap());
 
-        if check == false {
+        if !check {
             config_canvas(universe.clone());
             check = true;
         }
