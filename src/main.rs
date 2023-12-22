@@ -194,7 +194,7 @@ fn fill_cells(context: &CanvasRenderingContext2d, cells: &[Cell], cell_type: Cel
 
 // Every time we get a new animation frame, draw the grid, and advance the game.
 //
-// This includes the game itself (grid and cells) as well ad the
+// This includes the game itself (grid and cells) as well as the
 // frames per second widget.
 pub fn update_frame_loop(universe: Rc<RefCell<Universe>>) {
     let f = Rc::new(RefCell::new(None));
@@ -202,8 +202,7 @@ pub fn update_frame_loop(universe: Rc<RefCell<Universe>>) {
 
     let mut frames_per_second = FramesPerSecond::new("frames-per-second");
 
-    // Does not need to be FnMut if universe is behing a mutex
-    *g.borrow_mut() = Some(Closure::<dyn FnMut()>::new(move || {
+    *g.borrow_mut() = Some(Closure::new(move || {
         frames_per_second.update_frame();
         let id = request_animation_frame(f.borrow().as_ref().unwrap());
 
