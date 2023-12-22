@@ -6,7 +6,7 @@ use dioxus::html::GlobalAttributes;
 // import the prelude to get access to the `rsx!` macro and the `Scope` and `Element` types
 use dioxus::prelude::*;
 
-use game_of_life::bindgen_glue::*;
+use game_of_life::websys_utils::*;
 use game_of_life::console_log;
 use game_of_life::frames_per_second::FramesPerSecond;
 use game_of_life::universe::{Cell, Universe, GRID_COLUMNS, GRID_ROWS};

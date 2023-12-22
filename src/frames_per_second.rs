@@ -1,7 +1,7 @@
 //! Calculates the frames per second and places the text in the given id.
 
 use std::collections::VecDeque;
-use crate::bindgen_glue::{document, window};
+use crate::websys_utils::{document, window};
 
 pub struct FramesPerSecond {
     last_timeframe_stamp: f64,
