@@ -16,6 +16,8 @@ use wasm_bindgen::{JsCast, JsValue};
 use web_sys::CanvasRenderingContext2d;
 
 const CANVAS_ID: &str = "game-of-life-canvas";
+const ANIMATION_ELEMENT_ID: &str = "animation-id-element";
+const ANIMATION_ATTRIBUTE: &str = "animation-id";
 const CELL_SIZE: u32 = 6; // px
 const GRID_WIDTH: u32 = (CELL_SIZE + 1) * GRID_COLUMNS + 1;
 const GRID_HEIGHT: u32 = (CELL_SIZE + 1) * GRID_ROWS + 1;
@@ -80,6 +82,8 @@ fn config_canvas(universe: Rc<RefCell<Universe>>) {
         }
         canvas_ele.set_height(GRID_HEIGHT);
         canvas_ele.set_width(GRID_WIDTH);
+
+        draw_grid();
 
         let toggle_cell_closure =
             Closure::<dyn FnMut(_)>::new(move |event: web_sys::MouseEvent| {
@@ -206,13 +210,13 @@ pub fn update_frame_loop(universe: Rc<RefCell<Universe>>) {
         frames_per_second.update_frame();
         let id = request_animation_frame(f.borrow().as_ref().unwrap());
 
-        draw_grid();
-        draw_cells(&universe.borrow_mut());
         universe.borrow_mut().tick();
-        document()
-            .get_element_by_id("animation-id")
+        draw_cells(&universe.borrow_mut());
+
+        let _ = document()
+            .get_element_by_id(ANIMATION_ELEMENT_ID)
             .unwrap()
-            .set_text_content(Some(&id.to_string()))
+            .set_attribute(ANIMATION_ATTRIBUTE, &id.to_string());
     }));
 
     request_animation_frame(g.borrow().as_ref().unwrap());
@@ -221,44 +225,51 @@ pub fn update_frame_loop(universe: Rc<RefCell<Universe>>) {
 // Component that holds the grid and cells of the game of life.
 #[component]
 fn Universe(cx: Scope, name: String) -> Element {
+    console_log!("Creating new universe");
     let universe = Rc::new(RefCell::new(Universe::new()));
-    config_canvas_after_render(universe.clone());
-    update_frame_loop(universe.clone());
 
-    let mut count = use_state(cx, || 0);
-    let height = universe.borrow().height();
-    let width = universe.borrow().width();
+    // Kick off tasks to configure the canvas, but only after it has been initially
+    // rendered, since otherwise the canvas element have been created yet.
+    config_canvas_after_render(universe.clone());
+
+    // Need to create a clone of the universe for each closure that could
+    // be used to modify it.
     let universe_clear = universe.clone();
     let universe_random = universe.clone();
+    let mut count = use_state(cx, || 0);
 
     render! {
         div { display: "flex", justify_content: "center",
             button {
                 onclick: move |_| {
-                    let animation_id_element = document().get_element_by_id("animation-id").unwrap();
-                    let animation_id_text = animation_id_element.text_content();
+                    let animation_id_element = document()
+                        .get_element_by_id(ANIMATION_ELEMENT_ID)
+                        .unwrap();
+                    let animation_id_text = animation_id_element.get_attribute(ANIMATION_ATTRIBUTE);
                     if let Some(animation_id_text) = animation_id_text {
                         if let Ok(animation_id) = animation_id_text.parse::<i32>() {
                             cancel_animation_frame(animation_id);
-                            animation_id_element.set_text_content(None);
+                            let _ = animation_id_element.set_attribute(ANIMATION_ATTRIBUTE, "");
+                        }
+                    }
+                    update_frame_loop(universe.clone());
+                },
+                "Start"
+            }
+            button {
+                onclick: move |_| {
+                    let animation_id_element = document()
+                        .get_element_by_id(ANIMATION_ELEMENT_ID)
+                        .unwrap();
+                    let animation_id_text = animation_id_element.get_attribute(ANIMATION_ATTRIBUTE);
+                    if let Some(animation_id_text) = animation_id_text {
+                        if let Ok(animation_id) = animation_id_text.parse::<i32>() {
+                            cancel_animation_frame(animation_id);
+                            let _ = animation_id_element.set_attribute(ANIMATION_ATTRIBUTE, "");
                         }
                     }
                 },
                 "Stop"
-            }
-            button {
-                onclick: move |_| {
-                    let animation_id_element = document().get_element_by_id("animation-id").unwrap();
-                    let animation_id_text = animation_id_element.text_content();
-                    if let Some(animation_id_text) = animation_id_text {
-                        if let Ok(animation_id) = animation_id_text.parse::<i32>() {
-                            cancel_animation_frame(animation_id);
-                            animation_id_element.set_text_content(None);
-                        }
-                        update_frame_loop(universe.clone());
-                    }
-                },
-                "Start"
             }
             button {
                 onclick: move |_| {
@@ -276,9 +287,7 @@ fn Universe(cx: Scope, name: String) -> Element {
             }
         }
         div { display: "flex", justify_content: "center", canvas { id: CANVAS_ID } }
-        div { hidden: false, color: "green", font_family: "arial", padding: "0.5rem", position: "relative",
-            "Universe Size: {height}, {width}"
-        }
+        div { id: ANIMATION_ELEMENT_ID, white_space: "pre", font_family: "monospace" }
         button { onclick: move |_| { count += 1 }, "Up" }
         button { onclick: move |_| { count -= 1 }, "Down" }
         div { hidden: false, color: "green", padding: "0.5rem", position: "relative", font_family: "verdana",
@@ -290,8 +299,5 @@ fn Universe(cx: Scope, name: String) -> Element {
 // Frames per second component that shows how quickly the app is rendering animation frames.
 #[component]
 fn FramesPerSecond(cx: Scope) -> Element {
-    render! {
-        div { id: "frames-per-second", white_space: "pre", font_family: "monospace" }
-        div { id: "animation-id", white_space: "pre", font_family: "monospace" }
-    }
+    render! { div { id: "frames-per-second", white_space: "pre", font_family: "monospace" } }
 }
