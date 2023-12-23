@@ -6,10 +6,10 @@ use dioxus::html::GlobalAttributes;
 // import the prelude to get access to the `rsx!` macro and the `Scope` and `Element` types
 use dioxus::prelude::*;
 
-use game_of_life::websys_utils::*;
 use game_of_life::console_log;
 use game_of_life::frames_per_second::FramesPerSecond;
 use game_of_life::universe::{Cell, Universe, GRID_COLUMNS, GRID_ROWS};
+use game_of_life::websys_utils::*;
 
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::{JsCast, JsValue};
@@ -46,6 +46,138 @@ fn main() {
 
 #[component]
 fn App(cx: Scope) -> Element {
+    let animation_id = use_ref(cx, || None::<i32>);
+    let run_id = use_ref(cx, || 0_i32);
+
+    let currently_paused = use_state(cx, || true);
+    let target_paused = use_state(cx, || true);
+
+    let universe = use_state(cx, || None::<i32>);
+    let universe_to_set = universe.clone();
+
+    let f = Rc::new(RefCell::new(None));
+    let g = f.clone();
+
+    run_id.with(|run_id| {
+        console_log!("Running App: run:{} u:{:?}", run_id, universe.get());
+    });
+
+    *run_id.write_silent() = 10;
+
+    let animation_id_clone = animation_id.clone();
+    // let run_id_clone = run_id.clone();
+    *g.borrow_mut() = Some(Closure::<dyn FnMut()>::new(move || {
+        // console_log!("Frame came through (run id: {}", run_id_clone.read());
+
+        universe_to_set.modify(|val| {
+            if let Some(val) = val {
+                Some(val + 1)
+            } else {
+                Some(1)
+            }
+        });
+        console_log!("We need to queue another frame!");
+        let new_id = request_animation_frame(f.borrow().as_ref().unwrap());
+        animation_id_clone.set(Some(new_id));
+        console_log!("New frame: {new_id}!");
+    }));
+
+    // let queue_next_frame = || {
+    //     let new_id = request_animation_frame(&set_universe_and_queue);
+    //     animation_id.set(Some(new_id));
+    // };
+
+    // let stop_animation = || {
+    //     #[allow(clippy::clone_on_copy)]
+    //     if let Some(id) = animation_id.read().clone() {
+    //         cancel_animation_frame(id);
+    //         animation_id.set(None);
+    //     }
+    // };
+
+    // let animation_id_c = animation_id.clone();
+    // let stop_animation_c = stop_animation.clone();
+    use_effect(
+        cx,
+        (currently_paused, target_paused),
+        |(currently_paused, target_paused)| {
+            to_owned![animation_id];
+            async move {
+                if *currently_paused.get() != *target_paused.get() {
+                    console_log!(
+                        "target NOT equal to current: {currently_paused} != {target_paused}"
+                    );
+                    if *target_paused.get() {
+                        console_log!("We are being asked to pause");
+
+                        #[allow(clippy::clone_on_copy)]
+                        if let Some(id) = animation_id.read().clone() {
+                            console_log!(
+                                "going cancelled to cancel animation: {:?}",
+                                animation_id.read()
+                            );
+                            cancel_animation_frame(id);
+                            console_log!("animation cancelled: {:?}", animation_id.read());
+                        } else {
+                            console_log!("no animation was running");
+                        }
+                        if animation_id.read().is_some() {
+                            animation_id.set(None);
+                            console_log!("cleared animation id: {:?}", animation_id.read());
+                        }
+                    } else {
+                        console_log!("We are being asked to run");
+                        let new_id = request_animation_frame(g.borrow().as_ref().unwrap());
+                        animation_id.set(Some(new_id));
+                        console_log!("started animation with id: {:?}", animation_id.read());
+                    }
+                    currently_paused.set(*target_paused.get());
+                } else {
+                    console_log!("target equal to current: {currently_paused} == {target_paused}");
+                }
+            }
+        },
+    );
+
+    // let name = name.get().clone().unwrap_or(10);
+    let test_string = String::from("test");
+
+    // render! {
+    //     Universe { name: test_string }
+    //     FramesPerSecond {}
+    // }
+    // if animation_id.read().is_some() {
+    //     animation_id.set(Some(1));
+    // } else {
+    //     animation_id.set(Some(2));
+    // }
+    render! {
+        TestUniverse { universe: universe }
+        button {
+            onclick: move |_| {
+                target_paused.set(false);
+            },
+            "Start"
+        }
+        button {
+            onclick: move |_| {
+                target_paused.set(true);
+            },
+            "Stop"
+        }
+        div { "Animation: {animation_id.read():?}" }
+        div { "currently_paused: {currently_paused}" }
+        div { "target_paused: {target_paused}" }
+    }
+}
+
+#[component]
+fn TestUniverse<'a>(cx: Scope<'a>, universe: &'a UseState<Option<i32>>) -> Element {
+    render! { div { "Universe: {universe:?}" } }
+}
+
+#[component]
+fn App2(cx: Scope) -> Element {
     let test_string = String::from("test");
 
     render! {
