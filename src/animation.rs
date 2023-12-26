@@ -1,4 +1,4 @@
-//! Animation frame control via a custom Dioxus hook.
+//! Animation frame control via a custom Dioxus hook: use_animation_frame()
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -10,8 +10,8 @@ use crate::websys_utils::*;
 
 /// A custom Dioxus hook that abstracts the request_animation_frame() and cancel_animation_frame() DOM calls.
 ///
-/// Allows the caller to create a use_effect which watches the frame_id which can then
-/// take an action each time a frame is advanced.
+/// Allows the caller to create a use_effect() which watches the frame_id,
+/// which can then take an action each time a frame is advanced.
 ///
 /// Returns two UseState variables: frame_running and frame_id.
 /// * frame_running is true if frames are advancing.
@@ -28,8 +28,7 @@ pub fn use_animation_frame(cx: Scope, initial_state: bool) -> (&UseState<bool>, 
         to_owned![cancel_id, frame_id, frame_running];
 
         // frame_loop_holder holds a closure that is passed to request_animation_frame().
-        // This closure is called each time an animation frame completes.  We modify the universe
-        // inside this closure.
+        // This closure is called each time an animation frame completes.
         let frame_loop_holder = Rc::new(RefCell::new(None));
         let frame_loop_holder_clone = frame_loop_holder.clone();
 
