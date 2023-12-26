@@ -1,23 +1,21 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use dioxus::html::GlobalAttributes;
 // use dioxus_elements::canvas;
 // import the prelude to get access to the `rsx!` macro and the `Scope` and `Element` types
 use dioxus::prelude::*;
 
+use game_of_life::animation::use_animation_frame;
 use game_of_life::frames_per_second::FramesPerSecond;
 use game_of_life::universe::{Cell, Universe, GRID_COLUMNS, GRID_ROWS};
 use game_of_life::websys_utils::*;
-use game_of_life::{console_log, frames_per_second};
+
+use game_of_life::console_log;
 
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::{JsCast, JsValue};
+
 use web_sys::CanvasRenderingContext2d;
 
 const CANVAS_ID: &str = "game-of-life-canvas";
-const ANIMATION_ELEMENT_ID: &str = "animation-id-element";
-const ANIMATION_ATTRIBUTE: &str = "animation-id";
 const CELL_SIZE: u32 = 6; // px
 const GRID_WIDTH: u32 = (CELL_SIZE + 1) * GRID_COLUMNS + 1;
 const GRID_HEIGHT: u32 = (CELL_SIZE + 1) * GRID_ROWS + 1;
@@ -26,78 +24,11 @@ const GRID_COLOR: &str = "#CCCCCC";
 const ALIVE_COLOR: &str = "#000000";
 const DEAD_COLOR: &str = "#FFFFFF";
 
-// extern crate console_error_panic_hook;
-// use std::panic;
-
-// #[wasm_bindgen]
-// pub fn init_panic_hook() {
-//     // Better logging of panics in the browser
-//     console_error_panic_hook::set_once();
-// }
-
 // Entry point
 fn main() {
     // launch the dioxus app in a webview
     // dioxus_desktop::launch(App);
     dioxus_web::launch(App);
-}
-
-// A custom Dioxus hook that abstracts the request_animation_frame() and cancel_animation_frame() DOM calls.
-//
-// Allows the caller to create a use_effect which watches the frame_id which can then
-// take an action each time a frame is advanced.
-//
-// Returns two UseState variables: frame_running and frame_id.
-// * frame_running is true if frames are advancing.
-// * frame_id is incremented each time a new frame is run.
-//
-// If frame_running is set to true, frames advance.
-// If frame_running is set to false, frames stop advancing.
-fn use_animation_frame(cx: Scope, initial_state: bool) -> (&UseState<bool>, &UseState<i32>) {
-    let frame_running = use_state(cx, || initial_state);
-    let cancel_id = use_state(cx, || None::<i32>);
-    let frame_id = use_state(cx, || 0_i32);
-
-    use_effect(cx, (frame_running,), |(frame_running,)| {
-        to_owned![cancel_id, frame_id, frame_running];
-
-        // frame_loop_holder holds a closure that is passed to request_animation_frame().
-        // This closure is called each time an animation frame completes.  We modify the universe
-        // inside this closure.
-        let frame_loop_holder = Rc::new(RefCell::new(None));
-        let frame_loop_holder_clone = frame_loop_holder.clone();
-
-        let cancel_id_clone = cancel_id.clone();
-        *frame_loop_holder.borrow_mut() = Some(Closure::<dyn FnMut()>::new(move || {
-            let new_id =
-                request_animation_frame(frame_loop_holder_clone.borrow().as_ref().unwrap());
-            cancel_id_clone.set(Some(new_id));
-
-            frame_id.with_mut(|id| {
-                *id = id.wrapping_add(1);
-            })
-        }));
-
-        async move {
-            // If we are requested to run, but we are not running, run
-            if *frame_running.get() && cancel_id.get().is_none() {
-                let new_id = request_animation_frame(frame_loop_holder.borrow().as_ref().unwrap());
-                cancel_id.set(Some(new_id));
-            }
-
-            // If we are requested to stop, but we are running, cancel
-            if !*frame_running.get() && cancel_id.get().is_some() {
-                cancel_id.with_mut(|maybe_id| {
-                    if let Some(id) = maybe_id {
-                        cancel_animation_frame(*id);
-                        *maybe_id = None;
-                    }
-                });
-            }
-        }
-    });
-
-    (frame_running, frame_id)
 }
 
 #[component]
@@ -227,29 +158,6 @@ fn config_grid(universe: UseRef<Universe>) {
 }
 
 
-// Frames per second component that shows how quickly the app is rendering animation frames.
-#[component]
-fn FramesPerSecond(cx: Scope, frame_id: i32) -> Element {
-    let frames_per_second = use_ref(cx, FramesPerSecond::new);
-    let fps_text = use_state(cx, || frames_per_second.read().text());
-
-    // console_log!("Running app: {:?}", frame_id.get());
-
-    use_effect(cx, (frame_id,), |(_frame_id,)| {
-        to_owned![frames_per_second, fps_text];
-        async move {
-            frames_per_second.with_mut(|fps| {
-                fps.update_frame();
-                fps_text.modify(|_old_text| fps.text());
-            });
-        }
-    });
-
-    render! {
-        div { white_space: "pre", font_family: "monospace", fps_text.get().clone() }
-    }
-}
-
 // Draw the grid lines which contain the game of life cells.
 fn draw_grid() {
     let context = get_2d_context(CANVAS_ID);
@@ -285,7 +193,7 @@ fn get_grid_index(row: u32, col: u32) -> u32 {
 }
 
 // Draw all cells in the grid based on the state of the universe.
-fn draw_cells(cells: &Vec<Cell>) {
+fn draw_cells(cells: &[Cell]) {
     let context = get_2d_context(CANVAS_ID);
     // let cells = universe.cells();
 
@@ -322,3 +230,32 @@ fn fill_cells(context: &CanvasRenderingContext2d, cells: &[Cell], cell_type: Cel
         }
     }
 }
+
+// use web_sys::HtmlElement;
+
+// #[component]
+// fn Focus(cx: Scope) -> Element {
+//     let test = use_ref(cx, || None::<i32>);
+//     let input_element = use_ref(cx, || None::<HtmlElement>);
+  
+//     // input { r#type: "text", r#ref: input_element }
+//     // input { r#type: "text" },
+//     // button { onclick: focus_input, "Focus Input" }
+//     render! {
+//         input { r#type: "text", ty: move |_| { input_element } }
+//         button {
+//             onclick: move |_| {
+//                 input_element
+//                     .with(|input_element| {
+//                         input_element
+//                             .clone()
+//                             .map(|input_element| {
+//                                 let _ = input_element.focus();
+//                                 input_element
+//                             });
+//                     });
+//             },
+//             "Focus Input"
+//         }
+//     }
+// }

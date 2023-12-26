@@ -1,9 +1,34 @@
 //! Calculates the frames per second and places the text in the given id.
 
+use dioxus::prelude::*;
+
 use crate::websys_utils::window;
 use std::collections::VecDeque;
 
-pub struct FramesPerSecond {
+// Frames per second component that shows how quickly the app is rendering animation frames.
+#[component]
+pub fn FramesPerSecond(cx: Scope, frame_id: i32) -> Element {
+    let frames_per_second = use_ref(cx, FramesPerSecond::new);
+    let fps_text = use_state(cx, || frames_per_second.read().text());
+
+    // console_log!("Running app: {:?}", frame_id.get());
+
+    use_effect(cx, (frame_id,), |(_frame_id,)| {
+        to_owned![frames_per_second, fps_text];
+        async move {
+            frames_per_second.with_mut(|fps| {
+                fps.update_frame();
+                fps_text.modify(|_old_text| fps.text());
+            });
+        }
+    });
+
+    render! {
+        div { white_space: "pre", font_family: "monospace", fps_text.get().clone() }
+    }
+}
+
+struct FramesPerSecond {
     last_timeframe_stamp: f64,
     frames: VecDeque<f64>,
     performance: web_sys::Performance,
