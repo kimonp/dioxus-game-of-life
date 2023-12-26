@@ -1,4 +1,4 @@
-//! Glue code to access wasm-bindgen code.
+//! Short cuts for websys functions.
 
 use wasm_bindgen::prelude::*;
 use web_sys::CanvasRenderingContext2d;

@@ -1,17 +1,47 @@
 //! Calculates the frames per second and places the text in the given id.
 
-use std::collections::VecDeque;
-use crate::bindgen_glue::{document, window};
+use dioxus::prelude::*;
 
-pub struct FramesPerSecond {
+use crate::websys_utils::window;
+use std::collections::VecDeque;
+
+// Frames per second component that shows how quickly the app is rendering animation frames.
+#[component]
+pub fn FramesPerSecond(cx: Scope, frame_id: i32) -> Element {
+    let frames_per_second = use_ref(cx, FramesPerSecond::new);
+    let fps_text = use_state(cx, || frames_per_second.read().text());
+
+    // console_log!("Running app: {:?}", frame_id.get());
+
+    use_effect(cx, (frame_id,), |(_frame_id,)| {
+        to_owned![frames_per_second, fps_text];
+        async move {
+            frames_per_second.with_mut(|fps| {
+                fps.update_frame();
+                fps_text.modify(|_old_text| fps.text());
+            });
+        }
+    });
+
+    render! {
+        div { white_space: "pre", font_family: "monospace", fps_text.get().clone() }
+    }
+}
+
+struct FramesPerSecond {
     last_timeframe_stamp: f64,
     frames: VecDeque<f64>,
     performance: web_sys::Performance,
-    element_id: String,
+}
+
+impl Default for FramesPerSecond {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FramesPerSecond {
-    pub fn new(element_id: &str) -> FramesPerSecond {
+    pub fn new() -> FramesPerSecond {
         let window = window();
         let performance = window
             .performance()
@@ -22,12 +52,11 @@ impl FramesPerSecond {
             last_timeframe_stamp: start,
             frames: VecDeque::new(),
             performance,
-            element_id: element_id.to_string(),
         }
     }
 
     /// Display the current calculation for frames per second.
-    fn text(&self) -> String {
+    pub fn text(&self) -> String {
         let mut sum = 0_f64;
         let mut min = f64::MAX;
         let mut max = f64::MIN;
@@ -74,10 +103,5 @@ max of last 100 = {max}
         if self.frames.len() > 100 {
             self.frames.pop_back();
         }
-
-        let element_id = &self.element_id;
-        #[allow(clippy::expect_fun_call)]
-        let element = document().get_element_by_id(element_id).expect(&format!("Could not find element {element_id}"));
-        element.set_text_content(Some(&self.text()))
     }
 }

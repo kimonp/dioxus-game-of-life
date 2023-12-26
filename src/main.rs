@@ -1,23 +1,21 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use dioxus::html::GlobalAttributes;
 // use dioxus_elements::canvas;
 // import the prelude to get access to the `rsx!` macro and the `Scope` and `Element` types
 use dioxus::prelude::*;
 
-use game_of_life::bindgen_glue::*;
-use game_of_life::console_log;
+use game_of_life::animation::use_animation_frame;
 use game_of_life::frames_per_second::FramesPerSecond;
 use game_of_life::universe::{Cell, Universe, GRID_COLUMNS, GRID_ROWS};
+use game_of_life::websys_utils::*;
+
+use game_of_life::console_log;
 
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::{JsCast, JsValue};
+
 use web_sys::CanvasRenderingContext2d;
 
 const CANVAS_ID: &str = "game-of-life-canvas";
-const ANIMATION_ELEMENT_ID: &str = "animation-id-element";
-const ANIMATION_ATTRIBUTE: &str = "animation-id";
 const CELL_SIZE: u32 = 6; // px
 const GRID_WIDTH: u32 = (CELL_SIZE + 1) * GRID_COLUMNS + 1;
 const GRID_HEIGHT: u32 = (CELL_SIZE + 1) * GRID_ROWS + 1;
@@ -26,19 +24,8 @@ const GRID_COLOR: &str = "#CCCCCC";
 const ALIVE_COLOR: &str = "#000000";
 const DEAD_COLOR: &str = "#FFFFFF";
 
-// extern crate console_error_panic_hook;
-// use std::panic;
-
-// #[wasm_bindgen]
-// pub fn init_panic_hook() {
-//     // Better logging of panics in the browser
-//     console_error_panic_hook::set_once();
-// }
-
 // Entry point
 fn main() {
-    console_log!("Starting...");
-
     // launch the dioxus app in a webview
     // dioxus_desktop::launch(App);
     dioxus_web::launch(App);
@@ -46,31 +33,78 @@ fn main() {
 
 #[component]
 fn App(cx: Scope) -> Element {
-    let test_string = String::from("test");
+    let (frames_running, frame_id) = use_animation_frame(cx, false);
 
     render! {
-        Universe { name: test_string }
-        FramesPerSecond {}
+        GameOfLifeGrid { frame_id: *frame_id.get() }
+        div { display: "flex", justify_content: "center",
+            button {
+                onclick: move |_| {
+                    frames_running.set(true);
+                },
+                "Start"
+            }
+            button {
+                onclick: move |_| {
+                    frames_running.set(false);
+                },
+                "Stop"
+            }
+        }
+        FramesPerSecond { frame_id: *frame_id.get() }
     }
 }
 
-/// Wait for the first animation frame before re-configuring the canvas element.
-///
-/// If we try to configure it before the first render, it may not have been creted yet.
-fn config_canvas_after_render(universe: Rc<RefCell<Universe>>) {
-    let config_canvas_closure = Closure::<dyn FnMut()>::new(move || {
-        config_canvas(universe.clone());
+#[component]
+fn GameOfLifeGrid(cx: Scope<'a>, frame_id: i32) -> Element {
+    let universe = use_ref(cx, Universe::new);
+
+    use_on_create(cx, || {
+        to_owned![universe];
+        async move {
+            config_grid(universe);
+        }
     });
-    request_animation_frame(&config_canvas_closure);
-    // Forget the closure so the runtime does not try to manage it.
-    config_canvas_closure.forget();
+
+    use_effect(cx, (frame_id,), |(_frame_id,)| {
+        to_owned![universe];
+        async move {
+            universe.with_mut(|universe| {
+                universe.tick();
+                draw_cells(universe.cells());
+            })
+        }
+    });
+
+    render! {
+        div { display: "flex", justify_content: "center", canvas { id: CANVAS_ID } }
+        div { display: "flex", justify_content: "center",
+            button {
+                onclick: move |_| {
+                    universe
+                        .with_mut(|universe| {
+                            universe.random();
+                        });
+                    draw_cells(universe.read().cells());
+                },
+                "Random"
+            }
+            button {
+                onclick: move |_| {
+                    universe
+                        .with_mut(|universe| {
+                            universe.clear();
+                        });
+                    draw_cells(universe.read().cells());
+                },
+                "Clear"
+            }
+        }
+    }
 }
 
-// Configure the canvas size and add an event listener for clicks within the canvas grid.
-fn config_canvas(universe: Rc<RefCell<Universe>>) {
+fn config_grid(universe: UseRef<Universe>) {
     if let Some(canvas_ele) = document().get_element_by_id(CANVAS_ID) {
-        console_log!("Configuring canvas...");
-
         let canvas_ele: web_sys::HtmlCanvasElement = canvas_ele
             .dyn_into::<web_sys::HtmlCanvasElement>()
             .map_err(|_| ())
@@ -85,6 +119,7 @@ fn config_canvas(universe: Rc<RefCell<Universe>>) {
 
         draw_grid();
 
+        let universe = universe.clone();
         let toggle_cell_closure =
             Closure::<dyn FnMut(_)>::new(move |event: web_sys::MouseEvent| {
                 let canvas_ele = document().get_element_by_id(CANVAS_ID).unwrap();
@@ -107,11 +142,10 @@ fn config_canvas(universe: Rc<RefCell<Universe>>) {
                     .floor()
                     .min((GRID_HEIGHT - 1) as f64) as u32;
 
-                universe.borrow_mut().toggle_cell(row, col);
-
-                draw_cells(&universe.borrow_mut());
-
-                // console_log!("Row: {row} Col: {col}");
+                universe.with_mut(|universe| {
+                    universe.toggle_cell(row, col);
+                    draw_cells(universe.cells());
+                });
             });
         let _ = canvas_ele.add_event_listener_with_callback(
             "click",
@@ -122,6 +156,7 @@ fn config_canvas(universe: Rc<RefCell<Universe>>) {
         console_log!("Could not find id: {CANVAS_ID}");
     }
 }
+
 
 // Draw the grid lines which contain the game of life cells.
 fn draw_grid() {
@@ -158,9 +193,9 @@ fn get_grid_index(row: u32, col: u32) -> u32 {
 }
 
 // Draw all cells in the grid based on the state of the universe.
-fn draw_cells(universe: &Universe) {
+fn draw_cells(cells: &[Cell]) {
     let context = get_2d_context(CANVAS_ID);
-    let cells = universe.cells();
+    // let cells = universe.cells();
 
     context.begin_path();
 
@@ -196,108 +231,31 @@ fn fill_cells(context: &CanvasRenderingContext2d, cells: &[Cell], cell_type: Cel
     }
 }
 
-// Every time we get a new animation frame, draw the grid, and advance the game.
-//
-// This includes the game itself (grid and cells) as well as the
-// frames per second widget.
-pub fn update_frame_loop(universe: Rc<RefCell<Universe>>) {
-    let f = Rc::new(RefCell::new(None));
-    let g = f.clone();
+// use web_sys::HtmlElement;
 
-    let mut frames_per_second = FramesPerSecond::new("frames-per-second");
-
-    *g.borrow_mut() = Some(Closure::new(move || {
-        frames_per_second.update_frame();
-        let id = request_animation_frame(f.borrow().as_ref().unwrap());
-
-        universe.borrow_mut().tick();
-        draw_cells(&universe.borrow_mut());
-
-        let _ = document()
-            .get_element_by_id(ANIMATION_ELEMENT_ID)
-            .unwrap()
-            .set_attribute(ANIMATION_ATTRIBUTE, &id.to_string());
-    }));
-
-    request_animation_frame(g.borrow().as_ref().unwrap());
-}
-
-// Component that holds the grid and cells of the game of life.
-#[component]
-fn Universe(cx: Scope, name: String) -> Element {
-    console_log!("Creating new universe");
-    let universe = Rc::new(RefCell::new(Universe::new()));
-
-    // Kick off tasks to configure the canvas, but only after it has been initially
-    // rendered, since otherwise the canvas element have been created yet.
-    config_canvas_after_render(universe.clone());
-
-    // Need to create a clone of the universe for each closure that could
-    // be used to modify it.
-    let universe_clear = universe.clone();
-    let universe_random = universe.clone();
-    let mut count = use_state(cx, || 0);
-
-    render! {
-        div { display: "flex", justify_content: "center",
-            button {
-                onclick: move |_| {
-                    let animation_id_element = document()
-                        .get_element_by_id(ANIMATION_ELEMENT_ID)
-                        .unwrap();
-                    let animation_id_text = animation_id_element.get_attribute(ANIMATION_ATTRIBUTE);
-                    if let Some(animation_id_text) = animation_id_text {
-                        if let Ok(animation_id) = animation_id_text.parse::<i32>() {
-                            cancel_animation_frame(animation_id);
-                            let _ = animation_id_element.set_attribute(ANIMATION_ATTRIBUTE, "");
-                        }
-                    }
-                    update_frame_loop(universe.clone());
-                },
-                "Start"
-            }
-            button {
-                onclick: move |_| {
-                    let animation_id_element = document()
-                        .get_element_by_id(ANIMATION_ELEMENT_ID)
-                        .unwrap();
-                    let animation_id_text = animation_id_element.get_attribute(ANIMATION_ATTRIBUTE);
-                    if let Some(animation_id_text) = animation_id_text {
-                        if let Ok(animation_id) = animation_id_text.parse::<i32>() {
-                            cancel_animation_frame(animation_id);
-                            let _ = animation_id_element.set_attribute(ANIMATION_ATTRIBUTE, "");
-                        }
-                    }
-                },
-                "Stop"
-            }
-            button {
-                onclick: move |_| {
-                    universe_clear.borrow_mut().clear();
-                    draw_cells(&universe_clear.borrow_mut());
-                },
-                "Clear"
-            }
-            button {
-                onclick: move |_| {
-                    universe_random.borrow_mut().random();
-                    draw_cells(&universe_random.borrow_mut());
-                },
-                "Random"
-            }
-        }
-        div { display: "flex", justify_content: "center", canvas { id: CANVAS_ID } }
-        div { id: ANIMATION_ELEMENT_ID, white_space: "pre", font_family: "monospace" }
-        button { onclick: move |_| { count += 1 }, "Up" }
-        button { onclick: move |_| { count -= 1 }, "Down" }
-        div { hidden: false, color: "green", padding: "0.5rem", position: "relative", font_family: "verdana",
-            "Counter: {count} {name.to_uppercase()}"
-        }
-    }
-}
-
-// Frames per second component that shows how quickly the app is rendering animation frames.
-#[component]
-fn FramesPerSecond(cx: Scope) -> Element {
-    render! { div { id: "frames-per-second", white_space: "pre", font_family: "monospace" } }
-}
+// #[component]
+// fn Focus(cx: Scope) -> Element {
+//     let test = use_ref(cx, || None::<i32>);
+//     let input_element = use_ref(cx, || None::<HtmlElement>);
+  
+//     // input { r#type: "text", r#ref: input_element }
+//     // input { r#type: "text" },
+//     // button { onclick: focus_input, "Focus Input" }
+//     render! {
+//         input { r#type: "text", ty: move |_| { input_element } }
+//         button {
+//             onclick: move |_| {
+//                 input_element
+//                     .with(|input_element| {
+//                         input_element
+//                             .clone()
+//                             .map(|input_element| {
+//                                 let _ = input_element.focus();
+//                                 input_element
+//                             });
+//                     });
+//             },
+//             "Focus Input"
+//         }
+//     }
+// }
