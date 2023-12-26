@@ -6,10 +6,10 @@ use dioxus::html::GlobalAttributes;
 // import the prelude to get access to the `rsx!` macro and the `Scope` and `Element` types
 use dioxus::prelude::*;
 
-use game_of_life::console_log;
 use game_of_life::frames_per_second::FramesPerSecond;
 use game_of_life::universe::{Cell, Universe, GRID_COLUMNS, GRID_ROWS};
 use game_of_life::websys_utils::*;
+use game_of_life::{console_log, frames_per_second};
 
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::{JsCast, JsValue};
@@ -37,8 +37,6 @@ const DEAD_COLOR: &str = "#FFFFFF";
 
 // Entry point
 fn main() {
-    console_log!("Starting...");
-
     // launch the dioxus app in a webview
     // dioxus_desktop::launch(App);
     dioxus_web::launch(App);
@@ -61,7 +59,7 @@ fn use_animation_frame(cx: Scope, initial_state: bool) -> (&UseState<bool>, &Use
     let frame_id = use_state(cx, || 0_i32);
 
     use_effect(cx, (frame_running,), |(frame_running,)| {
-        to_owned![cancel_id, frame_id];
+        to_owned![cancel_id, frame_id, frame_running];
 
         // frame_loop_holder holds a closure that is passed to request_animation_frame().
         // This closure is called each time an animation frame completes.  We modify the universe
@@ -76,10 +74,9 @@ fn use_animation_frame(cx: Scope, initial_state: bool) -> (&UseState<bool>, &Use
             cancel_id_clone.set(Some(new_id));
 
             frame_id.with_mut(|id| {
-                *id += 1;
+                *id = id.wrapping_add(1);
             })
         }));
-        let frame_running = frame_running.clone();
 
         async move {
             // If we are requested to run, but we are not running, run
@@ -94,7 +91,6 @@ fn use_animation_frame(cx: Scope, initial_state: bool) -> (&UseState<bool>, &Use
                     if let Some(id) = maybe_id {
                         cancel_animation_frame(*id);
                         *maybe_id = None;
-                        console_log!("Animation cancelled");
                     }
                 });
             }
@@ -107,45 +103,151 @@ fn use_animation_frame(cx: Scope, initial_state: bool) -> (&UseState<bool>, &Use
 #[component]
 fn App(cx: Scope) -> Element {
     let (frames_running, frame_id) = use_animation_frame(cx, false);
-    let universe = use_state(cx, || None::<i32>);
 
-    console_log!("Running app: {:?}", frame_id.get());
+    render! {
+        GameOfLifeGrid { frame_id: *frame_id.get() }
+        div { display: "flex", justify_content: "center",
+            button {
+                onclick: move |_| {
+                    frames_running.set(true);
+                },
+                "Start"
+            }
+            button {
+                onclick: move |_| {
+                    frames_running.set(false);
+                },
+                "Stop"
+            }
+        }
+        FramesPerSecond { frame_id: *frame_id.get() }
+    }
+}
+
+#[component]
+fn GameOfLifeGrid(cx: Scope<'a>, frame_id: i32) -> Element {
+    let universe = use_ref(cx, Universe::new);
+
+    use_on_create(cx, || {
+        to_owned![universe];
+        async move {
+            config_grid(universe);
+        }
+    });
 
     use_effect(cx, (frame_id,), |(_frame_id,)| {
         to_owned![universe];
         async move {
-            universe.modify(|val| {
-                if let Some(val) = val {
-                    Some(val + 1)
-                } else {
-                    Some(1)
-                }
+            universe.with_mut(|universe| {
+                universe.tick();
+                draw_cells(universe.cells());
+            })
+        }
+    });
+
+    render! {
+        div { display: "flex", justify_content: "center", canvas { id: CANVAS_ID } }
+        div { display: "flex", justify_content: "center",
+            button {
+                onclick: move |_| {
+                    universe
+                        .with_mut(|universe| {
+                            universe.random();
+                        });
+                    draw_cells(universe.read().cells());
+                },
+                "Random"
+            }
+            button {
+                onclick: move |_| {
+                    universe
+                        .with_mut(|universe| {
+                            universe.clear();
+                        });
+                    draw_cells(universe.read().cells());
+                },
+                "Clear"
+            }
+        }
+    }
+}
+
+fn config_grid(universe: UseRef<Universe>) {
+    if let Some(canvas_ele) = document().get_element_by_id(CANVAS_ID) {
+        let canvas_ele: web_sys::HtmlCanvasElement = canvas_ele
+            .dyn_into::<web_sys::HtmlCanvasElement>()
+            .map_err(|_| ())
+            .unwrap();
+
+        if canvas_ele.height() == GRID_HEIGHT {
+            console_log!("Canvas already configured...");
+            return;
+        }
+        canvas_ele.set_height(GRID_HEIGHT);
+        canvas_ele.set_width(GRID_WIDTH);
+
+        draw_grid();
+
+        let universe = universe.clone();
+        let toggle_cell_closure =
+            Closure::<dyn FnMut(_)>::new(move |event: web_sys::MouseEvent| {
+                let canvas_ele = document().get_element_by_id(CANVAS_ID).unwrap();
+                let canvas_ele: web_sys::HtmlCanvasElement = canvas_ele
+                    .dyn_into::<web_sys::HtmlCanvasElement>()
+                    .map_err(|_| ())
+                    .unwrap();
+                let bounding_rect = canvas_ele.get_bounding_client_rect();
+
+                let scale_x = canvas_ele.width() as f64 / bounding_rect.width();
+                let scale_y = canvas_ele.width() as f64 / bounding_rect.width();
+
+                let canvas_left = event.client_x() as f64 - bounding_rect.left() * scale_x;
+                let canvas_top = event.client_y() as f64 - bounding_rect.top() * scale_y;
+
+                let row = (canvas_top / (CELL_SIZE + 1) as f64)
+                    .floor()
+                    .min((GRID_HEIGHT - 1) as f64) as u32;
+                let col = (canvas_left / (CELL_SIZE + 1) as f64)
+                    .floor()
+                    .min((GRID_HEIGHT - 1) as f64) as u32;
+
+                universe.with_mut(|universe| {
+                    universe.toggle_cell(row, col);
+                    draw_cells(universe.cells());
+                });
+            });
+        let _ = canvas_ele.add_event_listener_with_callback(
+            "click",
+            toggle_cell_closure.as_ref().unchecked_ref(),
+        );
+        toggle_cell_closure.forget();
+    } else {
+        console_log!("Could not find id: {CANVAS_ID}");
+    }
+}
+
+
+// Frames per second component that shows how quickly the app is rendering animation frames.
+#[component]
+fn FramesPerSecond(cx: Scope, frame_id: i32) -> Element {
+    let frames_per_second = use_ref(cx, FramesPerSecond::new);
+    let fps_text = use_state(cx, || frames_per_second.read().text());
+
+    // console_log!("Running app: {:?}", frame_id.get());
+
+    use_effect(cx, (frame_id,), |(_frame_id,)| {
+        to_owned![frames_per_second, fps_text];
+        async move {
+            frames_per_second.with_mut(|fps| {
+                fps.update_frame();
+                fps_text.modify(|_old_text| fps.text());
             });
         }
     });
 
     render! {
-        TestUniverse { universe: universe }
-        button {
-            onclick: move |_| {
-                frames_running.set(true);
-            },
-            "Start"
-        }
-        button {
-            onclick: move |_| {
-                frames_running.set(false);
-            },
-            "Stop"
-        }
-        div { "frame_id: {frame_id.get():?}" }
-        div { "frames_running: {frames_running}" }
+        div { white_space: "pre", font_family: "monospace", fps_text.get().clone() }
     }
-}
-
-#[component]
-fn TestUniverse<'a>(cx: Scope<'a>, universe: &'a UseState<Option<i32>>) -> Element {
-    render! { div { "Universe: {universe:?}" } }
 }
 
 #[component]
@@ -153,8 +255,8 @@ fn App2(cx: Scope) -> Element {
     let test_string = String::from("test");
 
     render! {
-        Universe { name: test_string }
-        FramesPerSecond {}
+        OldUniverse { name: test_string }
+        FramesPerSecond2 {}
     }
 }
 
@@ -213,7 +315,7 @@ fn config_canvas(universe: Rc<RefCell<Universe>>) {
 
                 universe.borrow_mut().toggle_cell(row, col);
 
-                draw_cells(&universe.borrow_mut());
+                // draw_cells(&universe.borrow_mut());
 
                 // console_log!("Row: {row} Col: {col}");
             });
@@ -262,9 +364,9 @@ fn get_grid_index(row: u32, col: u32) -> u32 {
 }
 
 // Draw all cells in the grid based on the state of the universe.
-fn draw_cells(universe: &Universe) {
+fn draw_cells(cells: &Vec<Cell>) {
     let context = get_2d_context(CANVAS_ID);
-    let cells = universe.cells();
+    // let cells = universe.cells();
 
     context.begin_path();
 
@@ -308,14 +410,14 @@ pub fn update_frame_loop(universe: Rc<RefCell<Universe>>) {
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
 
-    let mut frames_per_second = FramesPerSecond::new("frames-per-second");
+    let mut frames_per_second = FramesPerSecond::new();
 
     *g.borrow_mut() = Some(Closure::new(move || {
         frames_per_second.update_frame();
         let id = request_animation_frame(f.borrow().as_ref().unwrap());
 
         universe.borrow_mut().tick();
-        draw_cells(&universe.borrow_mut());
+        // draw_cells(&universe.borrow_mut());
 
         let _ = document()
             .get_element_by_id(ANIMATION_ELEMENT_ID)
@@ -328,7 +430,7 @@ pub fn update_frame_loop(universe: Rc<RefCell<Universe>>) {
 
 // Component that holds the grid and cells of the game of life.
 #[component]
-fn Universe(cx: Scope, name: String) -> Element {
+fn OldUniverse(cx: Scope, name: String) -> Element {
     console_log!("Creating new universe");
     let universe = Rc::new(RefCell::new(Universe::new()));
 
@@ -377,15 +479,15 @@ fn Universe(cx: Scope, name: String) -> Element {
             }
             button {
                 onclick: move |_| {
+                    /// draw_cells(&universe_clear.borrow_mut());
                     universe_clear.borrow_mut().clear();
-                    draw_cells(&universe_clear.borrow_mut());
                 },
                 "Clear"
             }
             button {
                 onclick: move |_| {
+                    /// draw_cells(&universe_random.borrow_mut());
                     universe_random.borrow_mut().random();
-                    draw_cells(&universe_random.borrow_mut());
                 },
                 "Random"
             }
@@ -402,6 +504,6 @@ fn Universe(cx: Scope, name: String) -> Element {
 
 // Frames per second component that shows how quickly the app is rendering animation frames.
 #[component]
-fn FramesPerSecond(cx: Scope) -> Element {
+fn FramesPerSecond2(cx: Scope) -> Element {
     render! { div { id: "frames-per-second", white_space: "pre", font_family: "monospace" } }
 }

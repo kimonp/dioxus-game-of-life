@@ -1,17 +1,22 @@
 //! Calculates the frames per second and places the text in the given id.
 
+use crate::websys_utils::window;
 use std::collections::VecDeque;
-use crate::websys_utils::{document, window};
 
 pub struct FramesPerSecond {
     last_timeframe_stamp: f64,
     frames: VecDeque<f64>,
     performance: web_sys::Performance,
-    element_id: String,
+}
+
+impl Default for FramesPerSecond {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FramesPerSecond {
-    pub fn new(element_id: &str) -> FramesPerSecond {
+    pub fn new() -> FramesPerSecond {
         let window = window();
         let performance = window
             .performance()
@@ -22,12 +27,11 @@ impl FramesPerSecond {
             last_timeframe_stamp: start,
             frames: VecDeque::new(),
             performance,
-            element_id: element_id.to_string(),
         }
     }
 
     /// Display the current calculation for frames per second.
-    fn text(&self) -> String {
+    pub fn text(&self) -> String {
         let mut sum = 0_f64;
         let mut min = f64::MAX;
         let mut max = f64::MIN;
@@ -74,10 +78,5 @@ max of last 100 = {max}
         if self.frames.len() > 100 {
             self.frames.pop_back();
         }
-
-        let element_id = &self.element_id;
-        #[allow(clippy::expect_fun_call)]
-        let element = document().get_element_by_id(element_id).expect(&format!("Could not find element {element_id}"));
-        element.set_text_content(Some(&self.text()))
     }
 }

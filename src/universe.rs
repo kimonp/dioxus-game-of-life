@@ -39,7 +39,6 @@ impl Universe {
 
         let cells = (0..width * height).map(|_i| Cell::Dead).collect();
 
-        console_log!("Test logging");
         Universe {
             width,
             height,
