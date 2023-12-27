@@ -5,10 +5,11 @@ adapted from the [rust wasm tutorial](https://rustwasm.github.io/docs/book/game-
 While the code from the original tutorial is about 50% Rust, 50% JavaScript, with the Dioxus framework the code is 100% Rust.
 
 ## Install and run
-* Install rust development environment: https://www.rust-lang.org/tools/install
-* clone this repository: `git clone git@github.com:kimonp/dioxus-game-of-life.git`
-* `cd dioxus-game-of-life`
+* Install the rust development environment: https://www.rust-lang.org/tools/install
 * Install the [dioxus CLI](https://dioxuslabs.com/learn/0.4/CLI/installation): `cargo install dioxus-cli`
+* Install the wasm target for rust: `rustup target add wasm32-unknown-unknown`
+* clone this repository: `git clone https://github.com/kimonp/dioxus-game-of-life.git`
+* `cd dioxus-game-of-life`
 * Run in debug mode with the dioxus cli: `dx serve --platform=web`
 * Point your browser at: http://localhost:8080
 
