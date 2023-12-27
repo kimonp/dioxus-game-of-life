@@ -18,6 +18,7 @@ fn App(cx: Scope) -> Element {
     let (frames_running, frame_id) = use_animation_frame(cx, false);
 
     render! {
+        h2 { display: "flex", justify_content: "center", font_family: "Helvetica", "Game of Life" }
         GameOfLifeGrid { frame_id: *frame_id.get() }
         div { display: "flex", justify_content: "center",
             button {
@@ -37,6 +38,9 @@ fn App(cx: Scope) -> Element {
     }
 }
 
+// https://www.w3schools.com/react/react_useref.asp
+// How to do the ref tag of an element?
+// How do you do this in dioxus? https://react.dev/learn/manipulating-the-dom-with-refs
 // use web_sys::HtmlElement;
 
 // #[component]
