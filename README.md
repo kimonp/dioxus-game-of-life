@@ -1,12 +1,14 @@
 # Conway's Game Of Life implemented with the Dioxus framework
 An implementation of [Conway's game of life](https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life) using the Dioxus framework,
-ported from the [rust wasm tutorial](https://rustwasm.github.io/docs/book/game-of-life/introduction.html).
+adapted from the [rust wasm tutorial](https://rustwasm.github.io/docs/book/game-of-life/introduction.html).
 
-While the code from the original tutorial is about 50% rust, 50% JavaScript, with the Dioxus framework the code can be 100% Rust.
+While the code from the original tutorial is about 50% Rust, 50% JavaScript, with the Dioxus framework the code is 100% Rust.
 
 ## Install and run
-* Install cargo and rust
-* Install the dioxus API: `cargo dioxus install`
+* Install rust development environment: https://www.rust-lang.org/tools/install
+* clone this repository: `git clone git@github.com:kimonp/dioxus-game-of-life.git`
+* `cd dioxus-game-of-life`
+* Install the [dioxus CLI](https://dioxuslabs.com/learn/0.4/CLI/installation): `cargo install dioxus-cli`
 * Run in debug mode with the dioxus cli: `dx serve --platform=web`
 * Point your browser at: http://localhost:8080
 
