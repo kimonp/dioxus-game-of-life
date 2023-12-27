@@ -21,7 +21,7 @@ const DEAD_COLOR: &str = "#FFFFFF";
 pub fn GameOfLifeGrid(cx: Scope<'a>, frame_id: i32) -> Element {
     // State of all the cells in the universe.
     let universe = use_ref(cx, Universe::new);
-    // Set by the onmounted event to give drawing functions access to the canvas element.
+    // Set by the "onmounted" event to give drawing functions access to the canvas element.
     let canvas_element = use_state(cx, || None::<web_sys::HtmlCanvasElement>);
     // Set true to redraw the cells.
     let redraw = use_state(cx, || false);
@@ -42,11 +42,9 @@ pub fn GameOfLifeGrid(cx: Scope<'a>, frame_id: i32) -> Element {
         to_owned![universe, canvas_element];
         async move {
             if *redraw.get() {
-                universe.with_mut(|universe| {
-                    if let Some(canvas_ele) = canvas_element.get() {
-                        draw_cells(canvas_ele, universe.cells());
-                    }
-                });
+                if let Some(canvas_ele) = canvas_element.get() {
+                    draw_cells(canvas_ele, universe.read().cells());
+                }
                 redraw.set(false);
             }
         }
@@ -82,10 +80,10 @@ fn clear_and_redraw(universe: &UseRef<Universe>, redraw: &UseState<bool>) {
     });
 }
 
-/// Dig out the canvas element from the mount event and configure the grid:
+/// Dig out the canvas element from the "onmount" event and configure the canvas as the grid:
 ///   * Set the height and width based on the universe size.
 ///   * Draw the grid.
-///   * Set the canvas_element to state so that it can be retrieved to draw cells.
+///   * Set the canvas_element to the state so that it can be retrieved later to draw cells.
 fn config_grid(
     mount_event: dioxus::prelude::Event<dioxus::events::MountedData>,
     canvas_element: &UseState<Option<web_sys::HtmlCanvasElement>>,
@@ -110,8 +108,7 @@ fn click_grid(
     universe: &UseRef<Universe>,
     canvas_element: &UseState<Option<web_sys::HtmlCanvasElement>>,
 ) {
-    let canvas_element = canvas_element.get();
-    if let Some(canvas_ele) = canvas_element {
+    if let Some(canvas_ele) = canvas_element.get() {
         let coords = event.inner().client_coordinates();
         let bounding_rect = canvas_ele.get_bounding_client_rect();
         let width = canvas_ele.width() as f64;
