@@ -6,8 +6,8 @@ While the code from the original tutorial is about 50% rust, 50% JavaScript, wit
 
 ## Install and run
 * Install cargo and rust
-* Install the dioxus API: cargo dioxus install
-* Run in debug mode with the dioxus cli: dx serve --platform=web
+* Install the dioxus API: `cargo dioxus install`
+* Run in debug mode with the dioxus cli: `dx serve --platform=web`
 * Point your browser at: http://localhost:8080
 
 ## Methodology
