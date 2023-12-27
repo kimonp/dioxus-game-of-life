@@ -71,6 +71,7 @@ pub fn GameOfLifeGrid(cx: Scope<'a>, frame_id: i32) -> Element {
 // Configure the grid.
 //
 // * Set the height and width, based on the universe.
+// * Draw the grid
 // * Set an onclick event_listener to toggle cells when clicked.
 fn config_grid(universe: UseRef<Universe>) {
     if let Some(canvas_ele) = document().get_element_by_id(CANVAS_ID) {
@@ -78,29 +79,17 @@ fn config_grid(universe: UseRef<Universe>) {
             .dyn_into::<web_sys::HtmlCanvasElement>()
             .map_err(|_| ())
             .unwrap();
-
-        if canvas_ele.height() == GRID_HEIGHT {
-            console_log!("Canvas already configured...");
-            return;
-        }
         canvas_ele.set_height(GRID_HEIGHT);
         canvas_ele.set_width(GRID_WIDTH);
-
         draw_grid();
 
         let universe = universe.clone();
+        let bounding_rect = canvas_ele.get_bounding_client_rect();
+        let width = canvas_ele.width() as f64;
+        let scale_x = width / bounding_rect.width();
+        let scale_y = width / bounding_rect.width();
         let toggle_cell_closure =
             Closure::<dyn FnMut(_)>::new(move |event: web_sys::MouseEvent| {
-                let canvas_ele = document().get_element_by_id(CANVAS_ID).unwrap();
-                let canvas_ele: web_sys::HtmlCanvasElement = canvas_ele
-                    .dyn_into::<web_sys::HtmlCanvasElement>()
-                    .map_err(|_| ())
-                    .unwrap();
-                let bounding_rect = canvas_ele.get_bounding_client_rect();
-
-                let scale_x = canvas_ele.width() as f64 / bounding_rect.width();
-                let scale_y = canvas_ele.width() as f64 / bounding_rect.width();
-
                 let canvas_left = event.client_x() as f64 - bounding_rect.left() * scale_x;
                 let canvas_top = event.client_y() as f64 - bounding_rect.top() * scale_y;
 
@@ -125,7 +114,6 @@ fn config_grid(universe: UseRef<Universe>) {
         console_log!("Could not find id: {CANVAS_ID}");
     }
 }
-
 
 // Draw the grid lines which contain the game of life cells.
 fn draw_grid() {
