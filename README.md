@@ -1,6 +1,7 @@
 # Conway's Game Of Life implemented with the Dioxus framework
-An implementation of [Conway's game of life](https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life) using the Dioxus framework,
-adapted from the [rust wasm tutorial](https://rustwasm.github.io/docs/book/game-of-life/introduction.html).
+An example implementation of [Conway's game of life](https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life)
+using the Dioxus framework, adapted from the
+[rust wasm tutorial](https://rustwasm.github.io/docs/book/game-of-life/introduction.html).
 
 The code from the original tutorial is about 50% Rust, 50% JavaScript.
 With the Dioxus framework the code is 100% Rust.
@@ -9,7 +10,7 @@ With the Dioxus framework the code is 100% Rust.
 
 ## Demonstrates
 * A Dioxus web app written completely in Rust.
-* Frame animation using get_next_frame() and abstracting to a Dioxus "use" hook.
+* Frame animation using `request_animation_frame()` and abstracting to a Dioxus `use_state` hook.
   * Limited by the frame rate of the monitor.
   * A FramesPerSecond component that displays the current frames per second.
 * Building a component from a 2d HTML canvas.
