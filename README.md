@@ -4,6 +4,16 @@ adapted from the [rust wasm tutorial](https://rustwasm.github.io/docs/book/game-
 
 While the code from the original tutorial is about 50% Rust, 50% JavaScript, with the Dioxus framework the code is 100% Rust.
 
+![Demo Image](game_of_life.png)
+
+## Demonstrates
+* A Dioxus web app written completely in Rust.
+* Frame animation using get_next_frame() and abstracting to a Dioxus "use" hook.
+  * Limited by the frame rate of the monitor.
+  * A FramesPerSecond component that displays the current frames per second.
+* Building a component from a 2d HTML canvas.
+* Using using Dioxus' onmount event to get an element (similar to react's use_ref)
+
 ## Install and run
 * Install the rust development environment: https://www.rust-lang.org/tools/install
 * Install the [dioxus CLI](https://dioxuslabs.com/learn/0.4/CLI/installation): `cargo install dioxus-cli`
