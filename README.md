@@ -2,7 +2,8 @@
 An implementation of [Conway's game of life](https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life) using the Dioxus framework,
 adapted from the [rust wasm tutorial](https://rustwasm.github.io/docs/book/game-of-life/introduction.html).
 
-While the code from the original tutorial is about 50% Rust, 50% JavaScript, with the Dioxus framework the code is 100% Rust.
+The code from the original tutorial is about 50% Rust, 50% JavaScript.
+With the Dioxus framework the code is 100% Rust.
 
 <img src="game_of_life.png" alt="Game of Life" class="center" width="480" height="616">
 
