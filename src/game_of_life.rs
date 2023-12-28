@@ -1,5 +1,5 @@
 //! Implementation of the GameOfLifeGrid component and supporting structures and methods.
-//! 
+//!
 //! Adapted from the rust wasm tutorial: https://rustwasm.github.io/docs/book/game-of-life/introduction.html
 
 use dioxus::prelude::*;
@@ -33,8 +33,18 @@ pub fn GameOfLifeGrid(cx: Scope<'a>, frame_id: i32) -> Element {
     // Set true to redraw the cells.  Start as false as there is no need to draw an empty grid.
     let redraw = use_state(cx, || false);
 
+    // Draw the grid when the canvas_element is created. Should happen only once.
+    use_effect(cx, (canvas_element,), |(_,)| {
+        to_owned![canvas_element];
+        async move {
+            if let Some(canvas_ele) = canvas_element.get() {
+                draw_grid(canvas_ele);
+            }
+        }
+    });
+
     // Advance and redraw the universe when the frame_id is changed.
-    use_effect(cx, (frame_id,), |(_frame_id,)| {
+    use_effect(cx, (frame_id,), |(_,)| {
         to_owned![universe, redraw];
         async move {
             universe.with_mut(|universe| {
@@ -57,14 +67,12 @@ pub fn GameOfLifeGrid(cx: Scope<'a>, frame_id: i32) -> Element {
         }
     });
 
-    // Pull out the grid from the buttons
-
     render! {
         div { display: "flex", justify_content: "center",
             canvas {
                 width: GRID_WIDTH as i64,
                 height: GRID_HEIGHT as i64,
-                onmounted: move |create_event| { config_grid(create_event, canvas_element) },
+                onmounted: move |create_event| { canvas_element.set(get_canvas_element(create_event)) },
                 onclick: move |mouse_event| { click_grid(mouse_event, universe, canvas_element) }
             }
         }
@@ -91,26 +99,17 @@ fn clear_and_redraw(universe: &UseRef<Universe>, redraw: &UseState<bool>) {
     });
 }
 
-/// TODO: Refactor to be just extraction: html_element_from_event
-/// 
-/// Dig out the canvas element from the "onmount" event and configure the canvas as the grid:
-///   * Draw the grid.
-///   * Set the canvas_element to the state so that it can be retrieved later to draw cells.
-fn config_grid(
-    mount_event: dioxus::prelude::Event<dioxus::events::MountedData>,
-    canvas_element: &UseState<Option<web_sys::HtmlCanvasElement>>,
-) {
+/// Dig out the canvas element from the "onmount" event (which we get when the canvas element is created).
+fn get_canvas_element(mount_event: dioxus::prelude::Event<dioxus::events::MountedData>) -> Option<HtmlCanvasElement> {
     if let Ok(Some(element)) = mount_event
         .get_raw_element()
         .map(|any| any.downcast_ref::<web_sys::Element>())
     {
-        let canvas_ele = into_canvas_element(element);
-
-        draw_grid(&canvas_ele);
-
-        canvas_element.set(Some(canvas_ele));
+        Some(into_canvas_element(element))
     } else {
         console_log!("mount_event should return a HtmlCanvasElement but did not");
+
+        None
     }
 }
 
