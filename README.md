@@ -6,7 +6,7 @@ While the code from the original tutorial is about 50% Rust, 50% JavaScript, wit
 
 ![Game of Life Image](./game_of_life.png)
 <img src="game_of_life.png" alt="Game of Life" width="961" height="1233">
-<img src="game_of_life.png" alt="Game of Life" width="240" height="308">
+<img src="game_of_life.png" alt="Game of Life" width="480" height="616">
 
 ## Demonstrates
 * A Dioxus web app written completely in Rust.
