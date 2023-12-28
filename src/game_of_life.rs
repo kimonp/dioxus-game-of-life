@@ -1,10 +1,15 @@
 //! Implementation of the GameOfLifeGrid component and supporting structures and methods.
+//! 
+//! Adapted from the rust wasm tutorial: https://rustwasm.github.io/docs/book/game-of-life/introduction.html
 
 use dioxus::prelude::*;
 use wasm_bindgen::JsValue;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
-use crate::{game_of_life::universe::{Cell, Universe, GRID_COLUMNS, GRID_ROWS}, websys_utils::{into_2d_context, into_canvas_element}};
+use crate::{
+    game_of_life::universe::{Cell, Universe, GRID_COLUMNS, GRID_ROWS},
+    websys_utils::{into_2d_context, into_canvas_element},
+};
 
 mod universe;
 
@@ -17,16 +22,18 @@ const ALIVE_COLOR: &str = "#000000";
 const DEAD_COLOR: &str = "#FFFFFF";
 
 /// Draws the game of life grid, cells and buttons that can modify the universe.
+///
+/// frame_id represents each frame.  Each time the frame_id changes, the universe is advanced.
 #[component]
 pub fn GameOfLifeGrid(cx: Scope<'a>, frame_id: i32) -> Element {
     // State of all the cells in the universe.
     let universe = use_ref(cx, Universe::new);
     // Set by the "onmounted" event to give drawing functions access to the canvas element.
     let canvas_element = use_state(cx, || None::<web_sys::HtmlCanvasElement>);
-    // Set true to redraw the cells.
+    // Set true to redraw the cells.  Start as false as there is no need to draw an empty grid.
     let redraw = use_state(cx, || false);
 
-    // Advance and redraw the universe when the frame is advanced.
+    // Advance and redraw the universe when the frame_id is changed.
     use_effect(cx, (frame_id,), |(_frame_id,)| {
         to_owned![universe, redraw];
         async move {
@@ -37,7 +44,7 @@ pub fn GameOfLifeGrid(cx: Scope<'a>, frame_id: i32) -> Element {
         }
     });
 
-    // Redraw all cells when redraw is set to true.
+    // Redraw the universe when redraw is set to true (and set redraw to false).
     use_effect(cx, (redraw,), |(redraw,)| {
         to_owned![universe, canvas_element];
         async move {
@@ -50,9 +57,13 @@ pub fn GameOfLifeGrid(cx: Scope<'a>, frame_id: i32) -> Element {
         }
     });
 
+    // Pull out the grid from the buttons
+
     render! {
         div { display: "flex", justify_content: "center",
             canvas {
+                width: GRID_WIDTH as i64,
+                height: GRID_HEIGHT as i64,
                 onmounted: move |create_event| { config_grid(create_event, canvas_element) },
                 onclick: move |mouse_event| { click_grid(mouse_event, universe, canvas_element) }
             }
@@ -80,8 +91,9 @@ fn clear_and_redraw(universe: &UseRef<Universe>, redraw: &UseState<bool>) {
     });
 }
 
+/// TODO: Refactor to be just extraction: html_element_from_event
+/// 
 /// Dig out the canvas element from the "onmount" event and configure the canvas as the grid:
-///   * Set the height and width based on the universe size.
 ///   * Draw the grid.
 ///   * Set the canvas_element to the state so that it can be retrieved later to draw cells.
 fn config_grid(
@@ -94,11 +106,11 @@ fn config_grid(
     {
         let canvas_ele = into_canvas_element(element);
 
-        canvas_ele.set_height(GRID_HEIGHT);
-        canvas_ele.set_width(GRID_WIDTH);
         draw_grid(&canvas_ele);
 
         canvas_element.set(Some(canvas_ele));
+    } else {
+        console_log!("mount_event should return a HtmlCanvasElement but did not");
     }
 }
 
@@ -128,16 +140,21 @@ fn click_grid(
             universe.toggle_cell(row, col);
             draw_cells(canvas_ele, universe.cells());
         });
+    } else {
+        console_log!("Clicked on canvas element before it exists")
     }
 }
 
 // Draw the grid lines which contain the game of life cells.
+//
+// Only drawn once at startup as the cells are inbetween the grid
+// and thus don't effect the grid pixels.
 fn draw_grid(canvas_ele: &HtmlCanvasElement) {
     let context = into_2d_context(canvas_ele);
 
     let grid_color = JsValue::from_str(GRID_COLOR);
-    let height = GRID_HEIGHT;
-    let width = GRID_WIDTH;
+    let height = canvas_ele.height();
+    let width = canvas_ele.width();
 
     context.begin_path();
     context.set_line_width(0.5);

@@ -4,7 +4,7 @@ adapted from the [rust wasm tutorial](https://rustwasm.github.io/docs/book/game-
 
 While the code from the original tutorial is about 50% Rust, 50% JavaScript, with the Dioxus framework the code is 100% Rust.
 
-![Demo Image](game_of_life.png)
+![Demo Image](./game_of_life.png)
 
 ## Demonstrates
 * A Dioxus web app written completely in Rust.
