@@ -1,7 +1,7 @@
 //! Short cuts for websys functions.
 
 use wasm_bindgen::prelude::*;
-use web_sys::CanvasRenderingContext2d;
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, Element};
 
 #[macro_export]
 macro_rules! console_log {
@@ -23,24 +23,21 @@ pub fn request_animation_frame(f: &Closure<dyn FnMut()>) -> i32 {
 
 /// Cancel a running aninmation frame.
 pub fn cancel_animation_frame(animation_id: i32) {
-    window().cancel_animation_frame(animation_id).expect("Unable to cancel animation_frame")
-}
-
-/// Get the DOM document.
-pub fn document() -> web_sys::Document {
     window()
-        .document()
-        .expect("should have a document on window")
+        .cancel_animation_frame(animation_id)
+        .expect("Unable to cancel animation_frame")
 }
 
-/// Return the 2d canvas context of the given element id.
-pub fn get_2d_context(element_id: &str) -> CanvasRenderingContext2d {
-    let canvas_ele = document().get_element_by_id(element_id).expect("requested element not found");
-    let canvas_ele: web_sys::HtmlCanvasElement = canvas_ele
+pub fn into_canvas_element(element: &Element) -> web_sys::HtmlCanvasElement {
+    element
+        .clone()
         .dyn_into::<web_sys::HtmlCanvasElement>()
         .map_err(|_| ())
-        .unwrap();
+        .unwrap()
+}
 
+/// Extract 2d rendering context from a canvas element.
+pub fn into_2d_context(canvas_ele: &HtmlCanvasElement) -> CanvasRenderingContext2d {
     canvas_ele
         .get_context("2d")
         .unwrap()

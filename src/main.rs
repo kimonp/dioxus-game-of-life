@@ -47,7 +47,7 @@ fn App(cx: Scope) -> Element {
 // fn Focus(cx: Scope) -> Element {
 //     let test = use_ref(cx, || None::<i32>);
 //     let input_element = use_ref(cx, || None::<HtmlElement>);
-  
+
 //     // input { r#type: "text", r#ref: input_element }
 //     // input { r#type: "text" },
 //     // button { onclick: focus_input, "Focus Input" }

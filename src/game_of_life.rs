@@ -1,16 +1,13 @@
 //! Implementation of the GameOfLifeGrid component and supporting structures and methods.
 
 use dioxus::prelude::*;
-use wasm_bindgen::prelude::Closure;
-use wasm_bindgen::{JsCast, JsValue};
-use web_sys::CanvasRenderingContext2d;
+use wasm_bindgen::JsValue;
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
-use crate::game_of_life::universe::{Cell, Universe, GRID_COLUMNS, GRID_ROWS};
-use crate::websys_utils::*;
+use crate::{game_of_life::universe::{Cell, Universe, GRID_COLUMNS, GRID_ROWS}, websys_utils::{into_2d_context, into_canvas_element}};
 
 mod universe;
 
-const CANVAS_ID: &str = "game-of-life-canvas";
 const CELL_SIZE: u32 = 6; // px
 const GRID_WIDTH: u32 = (CELL_SIZE + 1) * GRID_COLUMNS + 1;
 const GRID_HEIGHT: u32 = (CELL_SIZE + 1) * GRID_ROWS + 1;
@@ -22,114 +19,122 @@ const DEAD_COLOR: &str = "#FFFFFF";
 /// Draws the game of life grid, cells and buttons that can modify the universe.
 #[component]
 pub fn GameOfLifeGrid(cx: Scope<'a>, frame_id: i32) -> Element {
+    // State of all the cells in the universe.
     let universe = use_ref(cx, Universe::new);
+    // Set by the "onmounted" event to give drawing functions access to the canvas element.
+    let canvas_element = use_state(cx, || None::<web_sys::HtmlCanvasElement>);
+    // Set true to redraw the cells.
+    let redraw = use_state(cx, || false);
 
-    use_on_create(cx, || {
-        to_owned![universe];
-        async move {
-            config_grid(universe);
-        }
-    });
-
+    // Advance and redraw the universe when the frame is advanced.
     use_effect(cx, (frame_id,), |(_frame_id,)| {
-        to_owned![universe];
+        to_owned![universe, redraw];
         async move {
             universe.with_mut(|universe| {
                 universe.tick();
-                draw_cells(universe.cells());
+                redraw.set(true);
             })
         }
     });
 
+    // Redraw all cells when redraw is set to true.
+    use_effect(cx, (redraw,), |(redraw,)| {
+        to_owned![universe, canvas_element];
+        async move {
+            if *redraw.get() {
+                if let Some(canvas_ele) = canvas_element.get() {
+                    draw_cells(canvas_ele, universe.read().cells());
+                }
+                redraw.set(false);
+            }
+        }
+    });
+
     render! {
-        div { display: "flex", justify_content: "center", canvas { id: CANVAS_ID } }
         div { display: "flex", justify_content: "center",
-            button {
-                onclick: move |_| {
-                    universe
-                        .with_mut(|universe| {
-                            universe.random();
-                        });
-                    draw_cells(universe.read().cells());
-                },
-                "Random"
+            canvas {
+                onmounted: move |create_event| { config_grid(create_event, canvas_element) },
+                onclick: move |mouse_event| { click_grid(mouse_event, universe, canvas_element) }
             }
-            button {
-                onclick: move |_| {
-                    universe
-                        .with_mut(|universe| {
-                            universe.clear();
-                        });
-                    draw_cells(universe.read().cells());
-                },
-                "Clear"
-            }
+        }
+        div { display: "flex", justify_content: "center",
+            button { onclick: move |_| { randomize_and_redraw(universe, redraw) }, "Random" }
+            button { onclick: move |_| { clear_and_redraw(universe, redraw) }, "Clear" }
         }
     }
 }
 
-// Configure the grid.
-//
-// * Set the height and width, based on the universe.
-// * Set an onclick event_listener to toggle cells when clicked.
-fn config_grid(universe: UseRef<Universe>) {
-    if let Some(canvas_ele) = document().get_element_by_id(CANVAS_ID) {
-        let canvas_ele: web_sys::HtmlCanvasElement = canvas_ele
-            .dyn_into::<web_sys::HtmlCanvasElement>()
-            .map_err(|_| ())
-            .unwrap();
+/// Randomize the universe and set the redraw signal.
+fn randomize_and_redraw(universe: &UseRef<Universe>, redraw: &UseState<bool>) {
+    universe.with_mut(|universe| {
+        universe.random();
+        redraw.set(true);
+    });
+}
 
-        if canvas_ele.height() == GRID_HEIGHT {
-            console_log!("Canvas already configured...");
-            return;
-        }
+/// Clear the universe and set the redraw signal.
+fn clear_and_redraw(universe: &UseRef<Universe>, redraw: &UseState<bool>) {
+    universe.with_mut(|universe| {
+        universe.clear();
+        redraw.set(true);
+    });
+}
+
+/// Dig out the canvas element from the "onmount" event and configure the canvas as the grid:
+///   * Set the height and width based on the universe size.
+///   * Draw the grid.
+///   * Set the canvas_element to the state so that it can be retrieved later to draw cells.
+fn config_grid(
+    mount_event: dioxus::prelude::Event<dioxus::events::MountedData>,
+    canvas_element: &UseState<Option<web_sys::HtmlCanvasElement>>,
+) {
+    if let Ok(Some(element)) = mount_event
+        .get_raw_element()
+        .map(|any| any.downcast_ref::<web_sys::Element>())
+    {
+        let canvas_ele = into_canvas_element(element);
+
         canvas_ele.set_height(GRID_HEIGHT);
         canvas_ele.set_width(GRID_WIDTH);
+        draw_grid(&canvas_ele);
 
-        draw_grid();
-
-        let universe = universe.clone();
-        let toggle_cell_closure =
-            Closure::<dyn FnMut(_)>::new(move |event: web_sys::MouseEvent| {
-                let canvas_ele = document().get_element_by_id(CANVAS_ID).unwrap();
-                let canvas_ele: web_sys::HtmlCanvasElement = canvas_ele
-                    .dyn_into::<web_sys::HtmlCanvasElement>()
-                    .map_err(|_| ())
-                    .unwrap();
-                let bounding_rect = canvas_ele.get_bounding_client_rect();
-
-                let scale_x = canvas_ele.width() as f64 / bounding_rect.width();
-                let scale_y = canvas_ele.width() as f64 / bounding_rect.width();
-
-                let canvas_left = event.client_x() as f64 - bounding_rect.left() * scale_x;
-                let canvas_top = event.client_y() as f64 - bounding_rect.top() * scale_y;
-
-                let row = (canvas_top / (CELL_SIZE + 1) as f64)
-                    .floor()
-                    .min((GRID_HEIGHT - 1) as f64) as u32;
-                let col = (canvas_left / (CELL_SIZE + 1) as f64)
-                    .floor()
-                    .min((GRID_HEIGHT - 1) as f64) as u32;
-
-                universe.with_mut(|universe| {
-                    universe.toggle_cell(row, col);
-                    draw_cells(universe.cells());
-                });
-            });
-        let _ = canvas_ele.add_event_listener_with_callback(
-            "click",
-            toggle_cell_closure.as_ref().unchecked_ref(),
-        );
-        toggle_cell_closure.forget();
-    } else {
-        console_log!("Could not find id: {CANVAS_ID}");
+        canvas_element.set(Some(canvas_ele));
     }
 }
 
+/// Determine where the click was on the grid and toggle the appropriate cell.
+fn click_grid(
+    event: Event<MouseData>,
+    universe: &UseRef<Universe>,
+    canvas_element: &UseState<Option<web_sys::HtmlCanvasElement>>,
+) {
+    if let Some(canvas_ele) = canvas_element.get() {
+        let coords = event.inner().client_coordinates();
+        let bounding_rect = canvas_ele.get_bounding_client_rect();
+        let width = canvas_ele.width() as f64;
+        let scale_x = width / bounding_rect.width();
+        let scale_y = width / bounding_rect.width();
+        let canvas_left = coords.x - bounding_rect.left() * scale_x;
+        let canvas_top = coords.y - bounding_rect.top() * scale_y;
+
+        let row = (canvas_top / (CELL_SIZE + 1) as f64)
+            .floor()
+            .min((GRID_HEIGHT - 1) as f64) as u32;
+        let col = (canvas_left / (CELL_SIZE + 1) as f64)
+            .floor()
+            .min((GRID_HEIGHT - 1) as f64) as u32;
+
+        universe.with_mut(|universe| {
+            universe.toggle_cell(row, col);
+            draw_cells(canvas_ele, universe.cells());
+        });
+    }
+}
 
 // Draw the grid lines which contain the game of life cells.
-fn draw_grid() {
-    let context = get_2d_context(CANVAS_ID);
+fn draw_grid(canvas_ele: &HtmlCanvasElement) {
+    let context = into_2d_context(canvas_ele);
+
     let grid_color = JsValue::from_str(GRID_COLOR);
     let height = GRID_HEIGHT;
     let width = GRID_WIDTH;
@@ -164,9 +169,8 @@ fn get_grid_index(row: u32, col: u32) -> u32 {
 // Draw all the given cells in the grid.
 //
 // Cells should be a reference to all the cells in the universe.
-fn draw_cells(cells: &[Cell]) {
-    let context = get_2d_context(CANVAS_ID);
-    // let cells = universe.cells();
+fn draw_cells(canvas_ele: &HtmlCanvasElement, cells: &[Cell]) {
+    let context = into_2d_context(canvas_ele);
 
     context.begin_path();
 
