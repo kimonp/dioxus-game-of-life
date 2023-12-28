@@ -4,8 +4,6 @@ adapted from the [rust wasm tutorial](https://rustwasm.github.io/docs/book/game-
 
 While the code from the original tutorial is about 50% Rust, 50% JavaScript, with the Dioxus framework the code is 100% Rust.
 
-![Game of Life Image](./game_of_life.png)
-<img src="game_of_life.png" alt="Game of Life" width="961" height="1233">
 <img src="game_of_life.png" alt="Game of Life" width="480" height="616">
 
 ## Demonstrates
