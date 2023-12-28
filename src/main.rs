@@ -1,15 +1,14 @@
-// use dioxus_elements::canvas;
-// import the prelude to get access to the `rsx!` macro and the `Scope` and `Element` types
+//! Entrypoint.
+//! 
+//! Adapted from the rust wasm tutorial: https://rustwasm.github.io/docs/book/game-of-life/introduction.html
+
 use dioxus::prelude::*;
 
 use game_of_life::animation::use_animation_frame;
 use game_of_life::frames_per_second::FramesPerSecond;
 use game_of_life::game_of_life::GameOfLifeGrid;
 
-// Entry point
 fn main() {
-    // launch the dioxus app in a webview
-    // dioxus_desktop::launch(App);
     dioxus_web::launch(App);
 }
 
@@ -21,51 +20,9 @@ fn App(cx: Scope) -> Element {
         h2 { display: "flex", justify_content: "center", font_family: "Helvetica", "Game of Life" }
         GameOfLifeGrid { frame_id: *frame_id.get() }
         div { display: "flex", justify_content: "center",
-            button {
-                onclick: move |_| {
-                    frames_running.set(true);
-                },
-                "Start"
-            }
-            button {
-                onclick: move |_| {
-                    frames_running.set(false);
-                },
-                "Stop"
-            }
+            button { onclick: move |_| { frames_running.set(true) }, "Start" }
+            button { onclick: move |_| { frames_running.set(false) }, "Stop" }
         }
         FramesPerSecond { frame_id: *frame_id.get() }
     }
 }
-
-// https://www.w3schools.com/react/react_useref.asp
-// How to do the ref tag of an element?
-// How do you do this in dioxus? https://react.dev/learn/manipulating-the-dom-with-refs
-// use web_sys::HtmlElement;
-
-// #[component]
-// fn Focus(cx: Scope) -> Element {
-//     let test = use_ref(cx, || None::<i32>);
-//     let input_element = use_ref(cx, || None::<HtmlElement>);
-
-//     // input { r#type: "text", r#ref: input_element }
-//     // input { r#type: "text" },
-//     // button { onclick: focus_input, "Focus Input" }
-//     render! {
-//         input { r#type: "text", ty: move |_| { input_element } }
-//         button {
-//             onclick: move |_| {
-//                 input_element
-//                     .with(|input_element| {
-//                         input_element
-//                             .clone()
-//                             .map(|input_element| {
-//                                 let _ = input_element.focus();
-//                                 input_element
-//                             });
-//                     });
-//             },
-//             "Focus Input"
-//         }
-//     }
-// }
