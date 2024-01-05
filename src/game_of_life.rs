@@ -11,7 +11,7 @@ use crate::{
     websys_utils::{into_2d_context, into_canvas_element},
 };
 
-mod universe;
+pub mod universe;
 
 const CELL_SIZE: u32 = 6; // px
 const GRID_WIDTH: u32 = (CELL_SIZE + 1) * GRID_COLUMNS + 1;
@@ -21,17 +21,30 @@ const GRID_COLOR: &str = "#CCCCCC";
 const ALIVE_COLOR: &str = "#000000";
 const DEAD_COLOR: &str = "#FFFFFF";
 
+
+#[derive(Eq, PartialEq)]
+pub enum Redraw {
+    True,
+    False,
+}
+
+impl Redraw {
+    fn is_true(&self) -> bool {
+        *self == Redraw::True
+    }
+}
+
 /// Draws the game of life grid, cells and buttons that can modify the universe.
 ///
 /// frame_id represents each frame.  Each time the frame_id changes, the universe is advanced.
 #[component]
 pub fn GameOfLifeGrid(cx: Scope<'a>, frame_id: i32) -> Element {
     // State of all the cells in the universe.
-    let universe = use_ref(cx, Universe::new);
-    // Set by the "onmounted" event to give drawing functions access to the canvas element.
-    let canvas_element = use_state(cx, || None::<web_sys::HtmlCanvasElement>);
+    let universe = use_shared_state::<Universe>(cx).unwrap();
     // Set true to redraw the cells.  Start as false as there is no need to draw an empty grid.
-    let redraw = use_state(cx, || false);
+    let redraw = use_shared_state::<Redraw>(cx).unwrap();
+
+    let canvas_element = use_state(cx, || None::<web_sys::HtmlCanvasElement>);
 
     // Draw the grid when the canvas_element is created. Should happen only once.
     use_effect(cx, (canvas_element,), |(_,)| {
@@ -49,8 +62,10 @@ pub fn GameOfLifeGrid(cx: Scope<'a>, frame_id: i32) -> Element {
         async move {
             universe.with_mut(|universe| {
                 universe.tick();
-                redraw.set(true);
-            })
+            });
+            redraw.with_mut(|redraw| {
+                *redraw = Redraw::True;
+            });
         }
     });
 
@@ -58,11 +73,13 @@ pub fn GameOfLifeGrid(cx: Scope<'a>, frame_id: i32) -> Element {
     use_effect(cx, (redraw,), |(redraw,)| {
         to_owned![universe, canvas_element];
         async move {
-            if *redraw.get() {
+            if redraw.read().is_true() {
                 if let Some(canvas_ele) = canvas_element.get() {
                     draw_cells(canvas_ele, universe.read().cells());
                 }
-                redraw.set(false);
+                redraw.with_mut(|redraw| {
+                    *redraw = Redraw::False;
+                });
             }
         }
     });
@@ -83,19 +100,24 @@ pub fn GameOfLifeGrid(cx: Scope<'a>, frame_id: i32) -> Element {
     }
 }
 
+
 /// Randomize the universe and set the redraw signal.
-fn randomize_and_redraw(universe: &UseRef<Universe>, redraw: &UseState<bool>) {
+fn randomize_and_redraw(universe: &UseSharedState<Universe>, redraw: &UseSharedState<Redraw>) {
     universe.with_mut(|universe| {
         universe.random();
-        redraw.set(true);
+    });
+    redraw.with_mut(|redraw| {
+        *redraw = Redraw::True;
     });
 }
 
 /// Clear the universe and set the redraw signal.
-fn clear_and_redraw(universe: &UseRef<Universe>, redraw: &UseState<bool>) {
+fn clear_and_redraw(universe: &UseSharedState<Universe>, redraw: &UseSharedState<Redraw>) {
     universe.with_mut(|universe| {
         universe.clear();
-        redraw.set(true);
+    });
+    redraw.with_mut(|redraw| {
+        *redraw = Redraw::True;
     });
 }
 
@@ -116,7 +138,7 @@ fn get_canvas_element(mount_event: dioxus::prelude::Event<dioxus::events::Mounte
 /// Determine where the click was on the grid and toggle the appropriate cell.
 fn click_grid(
     event: Event<MouseData>,
-    universe: &UseRef<Universe>,
+    universe: &UseSharedState<Universe>,
     canvas_element: &UseState<Option<web_sys::HtmlCanvasElement>>,
 ) {
     if let Some(canvas_ele) = canvas_element.get() {
