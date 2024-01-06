@@ -2,12 +2,20 @@
 //! 
 //! Adapted from the rust wasm tutorial: https://rustwasm.github.io/docs/book/game-of-life/introduction.html
 
+#[macro_use]
+pub(crate) mod websys_utils;
+mod animation;
+mod frames_per_second;
+mod game_of_life;
+
 use dioxus::prelude::*;
 
-use game_of_life::animation::use_animation_frame;
-use game_of_life::frames_per_second::FramesPerSecond;
-use game_of_life::game_of_life::{GameOfLifeGrid, Redraw};
-use game_of_life::game_of_life::universe::Universe;
+use crate::{frames_per_second::FramesPerSecond, animation::use_animation_frame, game_of_life::{GameOfLife, Redraw}, game_of_life::universe::Universe};
+
+// use game_of_life::animation::use_animation_frame;
+// use game_of_life::frames_per_second::FramesPerSecond;
+// use game_of_life::game_of_life::{GameOfLife, Redraw};
+// use game_of_life::game_of_life::universe::Universe;
 
 fn main() {
     dioxus_web::launch(App);
@@ -25,7 +33,7 @@ fn App(cx: Scope) -> Element {
 
     render! {
         h2 { display: "flex", justify_content: "center", font_family: "Helvetica", "Game of Life" }
-        GameOfLifeGrid { frame_id: *frame_id.get() }
+        GameOfLife { frame_id: *frame_id.get() }
         div { display: "flex", justify_content: "center",
             button { onclick: move |_| { frames_running.set(true) }, "Start" }
             button { onclick: move |_| { frames_running.set(false) }, "Stop" }
