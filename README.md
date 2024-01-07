@@ -6,12 +6,17 @@ using the Dioxus framework, adapted from the
 The code from the original tutorial is about 50% Rust, 50% JavaScript.
 With the Dioxus framework the code is 100% Rust.
 
-<img src="game_of_life.png" alt="Game of Life" class="center" width="480" height="616">
-
 ## Versions
 
 * 1.x: Works on web only, uses canvas for rendering
 * 2.x: Works on web or desktop, uses SVG for rendering
+
+## Desktop App
+<img src="game_of_life_desktop.png" alt="Game of Life" class="center" width="530" height="741">
+
+## Browser
+<img src="game_of_life.png" alt="Game of Life" class="center" width="480" height="616">
+
 
 ## Demonstrates
 * A Dioxus web/desktop app written completely in Rust.
