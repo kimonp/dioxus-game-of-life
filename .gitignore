@@ -13,3 +13,6 @@ target/
 /target
 /dist
 index.html
+
+# Ignore debugging
+/firedbg

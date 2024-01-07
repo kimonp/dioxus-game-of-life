@@ -1,6 +1,8 @@
 //! Implements the game of life universe, which is represented by a grid of cells.
+#[cfg(feature = "desktop")]
+use rand::Rng;
 
-// use rand::{Rng, thread_rng};
+#[cfg(feature = "web")]
 use web_sys::js_sys::Math;
 
 pub const CELLS_PER_ROW: u32 = 64;
@@ -22,6 +24,7 @@ impl Cell {
     }
 }
 
+/// Represents the state of all cells in the universe.
 #[derive(Eq, PartialEq)]
 pub struct Universe {
     width: u32,
@@ -46,9 +49,18 @@ impl Universe {
         }
     }
 
-    pub fn random(&mut self) {
+    // Randomly set the value of all cells in the universe.
+    //
+    // 6 out of 10 cells on average are set to be alive.
+    pub fn random(&mut self) { 
+        #[cfg(feature = "desktop")]
+        let mut rng = rand::thread_rng();
+
         self.cells = (0..self.width * self.height)
             .map(|_i| {
+                #[cfg(feature = "desktop")]
+                let random = rng.gen_range(0..10);
+                #[cfg(feature = "web")]
                 let random = get_random_int(10);
 
                 if random > 3 {
@@ -60,11 +72,13 @@ impl Universe {
             .collect();
     }
 
+    // Return a reference to all cells.
     #[allow(unused)]
     pub fn cells(&self) -> &Vec<Cell> {
         &self.cells
     }
 
+    // Return a Vector of tuples of the (x,y) coordinates of all cells that are currently alive.
     pub fn get_living_cells(&self) -> Vec<(i64, i64)> {
         let mut cells = Vec::new();
 
@@ -117,6 +131,7 @@ impl Universe {
         self.cells = next;
     }
 
+    // Clear all cells in the universe.
     pub fn clear(&mut self) {
         self.cells = (0..self.width * self.height).map(|_i| Cell::Dead).collect();
     }
@@ -151,7 +166,7 @@ impl Universe {
     }
 }
 
+#[cfg(feature = "web")]
 fn get_random_int(max: u32) -> u32 {
     Math::abs(Math::floor(Math::random() * max as f64)) as u32
 }
-
