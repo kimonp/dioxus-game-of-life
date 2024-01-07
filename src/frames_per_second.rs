@@ -2,16 +2,20 @@
 
 use dioxus::prelude::*;
 
-use crate::websys_utils::window;
 use std::collections::VecDeque;
 
-// Frames per second component that shows how quickly the app is rendering animation frames.
+#[cfg(feature = "web")]
+use crate::websys_utils::window;
+#[cfg(feature = "desktop")]
+use std::time::Instant;
+
+/// Frames per second component that shows how quickly the app is rendering animation frames.
+///
+/// The web version does not have access to std::time, so we use web_sys::Performace hooks instead.
 #[component]
 pub fn FramesPerSecond(cx: Scope, frame_id: i32) -> Element {
     let frames_per_second = use_ref(cx, FramesPerSecond::new);
     let fps_text = use_state(cx, || frames_per_second.read().text());
-
-    // console_log!("Running app: {:?}", frame_id.get());
 
     use_effect(cx, (frame_id,), |(_frame_id,)| {
         to_owned![frames_per_second, fps_text];
@@ -29,8 +33,13 @@ pub fn FramesPerSecond(cx: Scope, frame_id: i32) -> Element {
 }
 
 struct FramesPerSecond {
+    #[cfg(feature = "web")]
     last_timeframe_stamp: f64,
+    #[cfg(feature = "desktop")]
+    last_timeframe_stamp: Instant,
+
     frames: VecDeque<f64>,
+    #[cfg(feature = "web")]
     performance: web_sys::Performance,
 }
 
@@ -41,6 +50,7 @@ impl Default for FramesPerSecond {
 }
 
 impl FramesPerSecond {
+    #[cfg(feature = "web")]
     pub fn new() -> FramesPerSecond {
         let window = window();
         let performance = window
@@ -52,6 +62,16 @@ impl FramesPerSecond {
             last_timeframe_stamp: start,
             frames: VecDeque::new(),
             performance,
+        }
+    }
+
+    #[cfg(feature = "desktop")]
+    pub fn new() -> FramesPerSecond {
+        let start = Instant::now();
+
+        FramesPerSecond {
+            last_timeframe_stamp: start,
+            frames: VecDeque::new(),
         }
     }
 
@@ -88,12 +108,28 @@ max of last 100 = {max}
         .to_string()
     }
 
+    #[cfg(feature = "web")]
+    fn calc_delta(&self) -> (f64, f64) {
+        let now = self.performance.now();
+        let delta = now - self.last_timeframe_stamp;
+
+        (now, delta)
+    }
+
+    #[cfg(feature = "desktop")]
+    fn calc_delta(&self) -> (Instant, f64) {
+        let now = Instant::now();
+        let delta = now - self.last_timeframe_stamp;
+        let delta = delta.as_micros() as f64 / 1000_f64;
+
+        (now, delta)
+    }
+
     /// Update the number of frames.
     ///
     /// Call this every time a frame is presented.
     pub fn update_frame(&mut self) {
-        let now = self.performance.now();
-        let delta = now - self.last_timeframe_stamp;
+        let (now, delta) = self.calc_delta();
 
         self.last_timeframe_stamp = now;
 
