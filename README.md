@@ -39,8 +39,8 @@ With the Dioxus framework the code is 100% Rust.
 * clone this repository: `git clone https://github.com/kimonp/dioxus-game-of-life.git`
 * `cd dioxus-game-of-life`
 * Version 2.0:
-  * Desktop: `dx serve --platform=desktop --featues=desktop`
-  * Web: `dx serve --platform=web --featues=web`
+  * Desktop: `dx serve --platform=desktop --features=desktop`
+  * Web: `dx serve --platform=web --features=web`
     * Point your browser at: http://localhost:8080
 * Version 1.0
   * Run in debug mode with the dioxus cli: `dx serve --platform=web`
