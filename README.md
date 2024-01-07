@@ -8,13 +8,29 @@ With the Dioxus framework the code is 100% Rust.
 
 <img src="game_of_life.png" alt="Game of Life" class="center" width="480" height="616">
 
+## Versions
+
+* 1.x: Works on web only, uses canvas for rendering
+* 2.x: Works on web or desktop, uses SVG for rendering
+
 ## Demonstrates
-* A Dioxus web app written completely in Rust.
+* A Dioxus web/desktop app written completely in Rust.
 * Frame animation using `request_animation_frame()` and abstracting to a Dioxus `use_state` hook.
   * Limited by the frame rate of the monitor.
   * A FramesPerSecond component that displays the current frames per second.
-* Building a component from a 2d HTML canvas.
-* Using using Dioxus' onmount event to get an element (similar to react's use_ref)
+* Version 1.x
+  * Building a component from a 2d HTML canvas.
+  * Using using Dioxus' onmount event to get an element (similar to react's use_ref)
+* Version 2.x
+  * How to create a Dioxus app that works with both desktop and web
+    * Use use_eval() to get access to the DOM
+    * Don't use canvas (svg instead)
+    * Access to precise system time
+    * Generating random numbers
+  * Use of SVG to draw grid and cells
+    * Use view_port to set coordinate systems to simplify coding
+      * Cell grid's units are pixels
+    * Create a grid using patterns with major and minor grid lines
 
 ## Install and run
 * Install the rust development environment: https://www.rust-lang.org/tools/install
@@ -22,8 +38,13 @@ With the Dioxus framework the code is 100% Rust.
 * Install the wasm target for rust: `rustup target add wasm32-unknown-unknown`
 * clone this repository: `git clone https://github.com/kimonp/dioxus-game-of-life.git`
 * `cd dioxus-game-of-life`
-* Run in debug mode with the dioxus cli: `dx serve --platform=web`
-* Point your browser at: http://localhost:8080
+* Version 2.0:
+  * Desktop: `dx serve --platform=desktop --featues=desktop`
+  * Web: `dx serve --platform=web --featues=web`
+    * Point your browser at: http://localhost:8080
+* Version 1.0
+  * Run in debug mode with the dioxus cli: `dx serve --platform=web`
+  * Point your browser at: http://localhost:8080
 
 ## Methodology
 Defines a `GameOfLifeGrid` component that renders the game of life (with several control buttons),
